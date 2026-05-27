@@ -1,6 +1,6 @@
 # SDN / Controller
 # Step 1: Install ryu deps, then install patched ryu (see README)
-eventlet
+eventlet==0.33.3
 netaddr
 oslo.config
 msgpack
