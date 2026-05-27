@@ -6,6 +6,7 @@ import argparse
 import json
 import logging
 import sys
+import threading
 from pathlib import Path
 
 from config import CFG
@@ -44,10 +45,13 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def build_env():
-    """Initialize SDNIDSEnv with topology, attack log, isolator, and flow collector."""
+def build_env(attack_ratio: float = 0.4):
+    """Initialize SDNIDSEnv with topology, attacks, isolator, and flow collector."""
+    import random
     from agent.env_wrapper import SDNIDSEnv
-    from env.attack_simulator import AttackEventLog
+    from env.attack_simulator import (
+        AttackEventLog, RogueAPAttack, ARPSpoofAttack,
+    )
     from env.topology import SDNTopology
     from detection.flow_collector import FlowCollector
     from isolation.isolator import Isolator
@@ -60,19 +64,62 @@ def build_env():
     collector = FlowCollector(dpids=[1, 2, 3])
     collector.start()
 
+    # Create attack simulators on Mininet host interfaces
+    rogue_host = topology.get_host_by_name(f"h{CFG.topology.rogue_host_idx}")
+    spoofer_host = topology.get_host_by_name(f"h{CFG.topology.spoofer_host_idx}")
+
+    rogue_iface = f"{rogue_host.name}-eth0" if rogue_host else "h5-eth0"
+    spoofer_iface = f"{spoofer_host.name}-eth0" if spoofer_host else "h6-eth0"
+    spoofer_mac = spoofer_host.MAC() if spoofer_host else "de:ad:be:ef:00:06"
+
+    rogue_ap = RogueAPAttack(
+        iface=rogue_iface,
+        on_event=attack_log.append,
+    )
+    arp_spoof = ARPSpoofAttack(
+        iface=spoofer_iface,
+        attacker_mac=spoofer_mac,
+        on_event=attack_log.append,
+    )
+
+    attacks = [rogue_ap, arp_spoof]
+
+    # Start a background thread that randomly starts/stops attacks
+    attack_thread_stop = threading.Event()
+
+    def attack_scheduler():
+        while not attack_thread_stop.is_set():
+            # Attack active period
+            if random.random() < attack_ratio:
+                atk = random.choice(attacks)
+                if not atk.is_running():
+                    atk.start(CFG.attack.rogue_beacon_rate_pps
+                              if isinstance(atk, RogueAPAttack)
+                              else CFG.attack.arp_spoof_rate_pps)
+                    duration = random.uniform(
+                        CFG.attack.attack_duration_sec_min,
+                        CFG.attack.attack_duration_sec_max,
+                    )
+                    attack_thread_stop.wait(duration)
+                    atk.stop()
+            attack_thread_stop.wait(random.uniform(2.0, 5.0))
+
+    sched_thread = threading.Thread(target=attack_scheduler, daemon=True)
+    sched_thread.start()
+
     env = SDNIDSEnv(
         topology=topology,
         attack_event_log=attack_log,
         isolator=isolator,
         flow_collector=collector,
     )
-    return env, topology, collector
+    return env, topology, collector, attacks, attack_thread_stop
 
 
 def train_custom(args: argparse.Namespace) -> None:
     from agent.dqn_agent import DQNAgent
 
-    env, topology, collector = build_env()
+    env, topology, collector, attacks, sched_stop = build_env(args.attack_ratio)
     agent = DQNAgent()
     metrics = MetricsLogger()
 
@@ -113,6 +160,9 @@ def train_custom(args: argparse.Namespace) -> None:
 
         agent.save(CFG.CHECKPOINT_DIR / "dqn_final.pt")
     finally:
+        sched_stop.set()
+        for atk in attacks:
+            atk.stop()
         _TRAIN_STATE_FILE.unlink(missing_ok=True)
         collector.stop()
         topology.stop()
@@ -122,12 +172,16 @@ def train_custom(args: argparse.Namespace) -> None:
 def run_sb3_training(args: argparse.Namespace) -> None:
     from agent.sb3_agent import build_sb3_dqn, train_sb3 as sb3_train
 
-    env, topology, collector = build_env()
+    env, topology, collector, attacks, sched_stop = build_env(args.attack_ratio)
     try:
         model = build_sb3_dqn(env, tensorboard_log=str(CFG.logging_cfg.tensorboard_dir))
         sb3_train(model, total_timesteps=args.timesteps,
                   save_path=CFG.CHECKPOINT_DIR / "sb3_dqn.zip")
     finally:
+        sched_stop.set()
+        for atk in attacks:
+            atk.stop()
+        _TRAIN_STATE_FILE.unlink(missing_ok=True)
         collector.stop()
         topology.stop()
         env.close()

@@ -92,28 +92,36 @@ export default function TopologyGraph({ topology, state }: Props) {
     }
   }, [topology])
 
-  // Update node colors based on action
+  // Update node colors based on action and role
   useEffect(() => {
     if (!nodesRef.current) return
 
+    const isAttack = state.ground_truth === 'attack'
     const updates: any[] = []
     topology.nodes.forEach(n => {
       if (n.type === 'host') {
         let color = ROLE_COLORS[n.role || 'normal'] || '#38bdf8'
+        let borderColor = '#64748b'
 
-        // If this host is being acted upon
-        if (state.current_action > 0) {
-          // Highlight based on current action
-          color = ACTION_COLORS[state.current_action]
+        if (n.role === 'rogue_ap' || n.role === 'arp_spoofer') {
+          if (isAttack && state.current_action > 0) {
+            // Attacking host: show action color (flag/block/isolate)
+            color = ACTION_COLORS[state.current_action]
+            borderColor = '#fbbf24'
+          } else if (isAttack) {
+            // Attack happening but agent hasn't acted yet
+            borderColor = '#fbbf24'
+          }
+        } else {
+          // Normal host: pulse border during attack
+          if (isAttack) {
+            borderColor = '#f97316'
+          }
         }
 
         updates.push({
           id: n.id,
-          color: {
-            background: color,
-            border: state.ground_truth === 'attack' && n.role !== 'normal'
-              ? '#fbbf24' : '#64748b',
-          },
+          color: { background: color, border: borderColor },
         })
       }
     })
