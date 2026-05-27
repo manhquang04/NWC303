@@ -1,5 +1,9 @@
 # SDN / Controller (ryu installed separately from patched source)
 eventlet
+netaddr
+oslo.config
+msgpack
+tinyrpc
 
 # DRL
 gymnasium

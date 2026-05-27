@@ -100,7 +100,7 @@ sed -i 's/_main_module()._orig_get_script_args = easy_install.get_script_args/pa
 pip install . --no-build-isolation
 cd ~/NWC303
 
-# Install remaining dependencies
+# Install remaining dependencies (includes ryu's missing deps: netaddr, oslo.config, etc.)
 pip install -r requirements.txt
 
 # Web frontend
@@ -113,8 +113,8 @@ cd web/frontend && npm install && npm run build && cd ../..
 # Terminal 1: Ryu controller
 ryu-manager env/ryu_controller.py --observe-links
 
-# Terminal 2: Train DRL agent (requires sudo)
-sudo python3 main.py train --algo custom --episodes 1000
+# Terminal 2: Train DRL agent (requires sudo, use venv python)
+sudo .venv/bin/python3 main.py train --algo custom --episodes 1000
 
 # Terminal 3: Web dashboard
 python3 main.py web --port 8000
@@ -124,7 +124,7 @@ python3 main.py web --port 8000
 tensorboard --logdir runs/
 
 # Evaluate trained model
-sudo python3 main.py evaluate --checkpoint checkpoints/dqn_final.pt --algo custom
+sudo .venv/bin/python3 main.py evaluate --checkpoint checkpoints/dqn_final.pt --algo custom
 
 # Generate plots
 python3 main.py plot

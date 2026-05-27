@@ -23,12 +23,12 @@ const metricValue = (val: number, fmt: string = '.2f'): React.CSSProperties => (
   fontFamily: 'monospace',
 })
 
-function fmt(v: number, decimals = 2): string {
-  return v.toFixed(decimals)
+function fmt(v: number | undefined, decimals = 2): string {
+  return (v ?? 0).toFixed(decimals)
 }
 
-function fmtPct(v: number): string {
-  return (v * 100).toFixed(1) + '%'
+function fmtPct(v: number | undefined): string {
+  return ((v ?? 0) * 100).toFixed(1) + '%'
 }
 
 function colorScale(v: number, good: 'high' | 'low' = 'high'): string {

@@ -39,7 +39,7 @@ export default function ActionTimeline({ history }: Props) {
           return (
             <div
               key={i}
-              title={`Step ${entry.step}\nAction: ${entry.action_name}\nGT: ${entry.ground_truth}\nReward: ${entry.reward.toFixed(1)}`}
+              title={`Step ${entry.step}\nAction: ${entry.action_name}\nGT: ${entry.ground_truth}\nReward: ${(entry.reward ?? 0).toFixed(1)}`}
               style={{
                 flex: 1,
                 minWidth: '4px',
