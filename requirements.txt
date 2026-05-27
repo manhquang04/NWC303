@@ -1,9 +1,12 @@
-# SDN / Controller (ryu installed separately from patched source)
+# SDN / Controller
+# Step 1: Install ryu deps, then install patched ryu (see README)
 eventlet
 netaddr
 oslo.config
 msgpack
 tinyrpc
+routes
+webob
 
 # DRL
 gymnasium

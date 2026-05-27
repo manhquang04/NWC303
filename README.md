@@ -91,17 +91,17 @@ sudo systemctl start openvswitch-switch
 python3.11 -m venv .venv
 source .venv/bin/activate
 
+# Install all Python dependencies first (includes ryu's deps)
+pip install -r requirements.txt
+
 # Install Ryu (requires patch for setuptools compatibility)
 cd /tmp
 wget https://files.pythonhosted.org/packages/source/r/ryu/ryu-4.34.tar.gz
 tar xzf ryu-4.34.tar.gz
 cd ryu-4.34
 sed -i 's/_main_module()._orig_get_script_args = easy_install.get_script_args/pass/' ryu/hooks.py
-pip install . --no-build-isolation
+pip install . --no-build-isolation --no-deps
 cd ~/NWC303
-
-# Install remaining dependencies (includes ryu's missing deps: netaddr, oslo.config, etc.)
-pip install -r requirements.txt
 
 # Web frontend
 cd web/frontend && npm install && npm run build && cd ../..
@@ -124,7 +124,7 @@ python3 main.py web --port 8000
 tensorboard --logdir runs/
 
 # Evaluate trained model
-sudo .venv/bin/python3 main.py evaluate --checkpoint checkpoints/dqn_final.pt --algo custom
+sudo python3 main.py evaluate --checkpoint checkpoints/dqn_final.pt --algo custom
 
 # Generate plots
 python3 main.py plot
