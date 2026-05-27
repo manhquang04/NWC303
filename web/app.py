@@ -208,6 +208,15 @@ async def get_snapshot():
     return bridge.get_network_snapshot()
 
 
+@app.post("/api/action")
+async def manual_action(action: int = 0, ground_truth: str = "attack"):
+    bridge = get_bridge()
+    if bridge is None:
+        return {"error": "Bridge not initialized"}
+    bridge.update_state(action=action, ground_truth=ground_truth, reward=0.0)
+    return {"status": "ok", "action": action, "ground_truth": ground_truth}
+
+
 @app.get("/api/config")
 async def get_config():
     return {

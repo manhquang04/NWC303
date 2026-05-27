@@ -268,7 +268,7 @@ class WebBridge:
                 self._action_history = self._action_history[-500:]
 
             if action != 0:
-                event_msg = self._format_event(action, ground_truth, reward)
+                event_msg = self._format_event(action, ground_truth, reward, raw_features)
                 self._event_log.append({
                     "timestamp": ts,
                     "message": event_msg,
@@ -304,10 +304,21 @@ class WebBridge:
                 mac_table=mac_table,
             )
 
-    def _format_event(self, action: int, ground_truth: str, reward: float) -> str:
+    def _format_event(self, action: int, ground_truth: str, reward: float,
+                      raw_features: Optional[Dict[str, float]] = None) -> str:
         action_name = ACTION_NAMES[action].upper()
+        attack_detail = ""
+        if ground_truth == "attack" and raw_features:
+            arp_rate = raw_features.get("arp_reply_rate", 0)
+            beacon = raw_features.get("ssid_beacon_count", 0)
+            if arp_rate > 10:
+                attack_detail = " [ARP Spoofing h6]"
+            elif beacon > 0:
+                attack_detail = " [Rogue AP h5]"
+            else:
+                attack_detail = " [Attack]"
         gt_info = f"({ground_truth})" if ground_truth != "unknown" else ""
-        return f"{action_name} {gt_info} reward={reward:+.1f}"
+        return f"{action_name}{attack_detail} {gt_info} reward={reward:+.1f}"
 
     def _get_metrics_dict(self) -> Dict[str, float]:
         report = self.metrics_calc.compute(episodes=self._episode)

@@ -9,10 +9,11 @@ const ACTION_COLORS: Record<number, string> = {
   3: '#a855f7', // isolate - purple
 }
 
-const ROLE_COLORS: Record<string, string> = {
-  normal: '#38bdf8',
-  rogue_ap: '#ef4444',
-  arp_spoofer: '#f97316',
+const ACTION_LABELS: Record<number, string> = {
+  0: 'ALLOW',
+  1: 'FLAG',
+  2: 'BLOCK',
+  3: 'ISOLATE',
 }
 
 interface Props {
@@ -35,7 +36,7 @@ export default function TopologyGraph({ topology, state }: Props) {
         shape: n.type === 'switch' ? 'diamond' : 'dot',
         size: n.type === 'switch' ? 30 : 20,
         color: {
-          background: n.type === 'switch' ? '#475569' : (ROLE_COLORS[n.role || 'normal'] || '#38bdf8'),
+          background: n.type === 'switch' ? '#475569' : '#38bdf8',
           border: '#64748b',
           highlight: { background: '#818cf8', border: '#6366f1' },
         },
@@ -72,58 +73,59 @@ export default function TopologyGraph({ topology, state }: Props) {
           },
           stabilization: { iterations: 100 },
         },
-        interaction: {
-          hover: true,
-          tooltipDelay: 200,
-        },
-        nodes: {
-          borderWidth: 2,
-          shadow: true,
-        },
-        edges: {
-          smooth: { enabled: true, type: 'continuous', roundness: 0.5 },
-        },
+        interaction: { hover: true, tooltipDelay: 200 },
+        nodes: { borderWidth: 2, shadow: true },
+        edges: { smooth: { enabled: true, type: 'continuous', roundness: 0.5 } },
       }
     )
     networkRef.current = network
-
-    return () => {
-      network.destroy()
-    }
+    return () => { network.destroy() }
   }, [topology])
 
-  // Update node colors based on action and role
+  // Update node colors based on attack state and action
   useEffect(() => {
     if (!nodesRef.current) return
 
     const isAttack = state.ground_truth === 'attack'
+    const action = state.current_action
     const updates: any[] = []
+
     topology.nodes.forEach(n => {
-      if (n.type === 'host') {
-        let color = ROLE_COLORS[n.role || 'normal'] || '#38bdf8'
-        let borderColor = '#64748b'
+      if (n.type !== 'host') return
 
-        if (n.role === 'rogue_ap' || n.role === 'arp_spoofer') {
-          if (isAttack && state.current_action > 0) {
-            // Attacking host: show action color (flag/block/isolate)
-            color = ACTION_COLORS[state.current_action]
-            borderColor = '#fbbf24'
-          } else if (isAttack) {
-            // Attack happening but agent hasn't acted yet
-            borderColor = '#fbbf24'
-          }
+      const isAttacker = n.role === 'rogue_ap' || n.role === 'arp_spoofer'
+      let color = '#38bdf8' // default blue
+      let borderColor = '#64748b'
+      let label = n.label
+      let borderWidth = 2
+
+      if (isAttacker && isAttack) {
+        if (action > 0) {
+          // Agent acted: show action color
+          color = ACTION_COLORS[action]
+          borderColor = '#fbbf24'
+          label = `${n.label}\n[${ACTION_LABELS[action]}]`
+          borderWidth = 4
         } else {
-          // Normal host: pulse border during attack
-          if (isAttack) {
-            borderColor = '#f97316'
-          }
+          // Attack happening, agent hasn't acted: red/orange pulse
+          color = n.role === 'rogue_ap' ? '#ef4444' : '#f97316'
+          borderColor = '#fbbf24'
+          label = n.role === 'rogue_ap'
+            ? `${n.label}\nROGUE AP`
+            : `${n.label}\nSPOOFING`
+          borderWidth = 4
         }
-
-        updates.push({
-          id: n.id,
-          color: { background: color, border: borderColor },
-        })
+      } else if (isAttack && !isAttacker) {
+        // Normal host during attack: subtle warning border
+        borderColor = '#f97316'
       }
+
+      updates.push({
+        id: n.id,
+        label,
+        color: { background: color, border: borderColor },
+        borderWidth,
+      })
     })
 
     if (updates.length > 0) {
@@ -134,25 +136,37 @@ export default function TopologyGraph({ topology, state }: Props) {
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* Attack Alert Banner */}
+      {state.ground_truth === 'attack' && (
+        <div style={{
+          position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
+          background: state.current_action > 0
+            ? 'rgba(168,85,247,0.9)' : 'rgba(239,68,68,0.9)',
+          padding: '8px 20px', borderRadius: '8px', fontSize: '14px',
+          fontWeight: 700, color: '#fff', textAlign: 'center',
+          boxShadow: '0 0 20px rgba(239,68,68,0.5)',
+          animation: 'pulse 1.5s ease-in-out infinite',
+        }}>
+          {state.current_action > 0
+            ? `ATTACK DETECTED - ${ACTION_LABELS[state.current_action].toUpperCase()}`
+            : 'ATTACK IN PROGRESS - MONITORING'}
+        </div>
+      )}
+
       {/* Legend */}
       <div style={{
-        position: 'absolute',
-        bottom: 8,
-        left: 8,
-        background: 'rgba(15,23,42,0.9)',
-        padding: '8px 12px',
-        borderRadius: '6px',
-        fontSize: '11px',
-        display: 'flex',
-        gap: '12px',
+        position: 'absolute', bottom: 8, left: 8,
+        background: 'rgba(15,23,42,0.9)', padding: '8px 12px',
+        borderRadius: '6px', fontSize: '11px', display: 'flex', gap: '12px',
       }}>
         <span><span style={{ color: '#22c55e' }}>●</span> Allow</span>
         <span><span style={{ color: '#eab308' }}>●</span> Flag</span>
         <span><span style={{ color: '#ef4444' }}>●</span> Block</span>
         <span><span style={{ color: '#a855f7' }}>●</span> Isolate</span>
         <span style={{ color: '#64748b' }}>|</span>
-        <span><span style={{ color: '#ef4444' }}>◆</span> Rogue AP</span>
-        <span><span style={{ color: '#f97316' }}>◆</span> Spoofer</span>
+        <span><span style={{ color: '#ef4444' }}>●</span> Rogue AP</span>
+        <span><span style={{ color: '#f97316' }}>●</span> ARP Spoofer</span>
       </div>
     </div>
   )

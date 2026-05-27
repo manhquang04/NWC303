@@ -43,18 +43,20 @@ export default function EventLog({ events }: Props) {
             const time = new Date(evt.timestamp * 1000)
             const timeStr = time.toLocaleTimeString()
             const color = ACTION_COLORS[evt.action_name] || '#64748b'
+            const msg = evt.message || ''
+            const isAttack = msg.toLowerCase().includes('attack')
             return (
               <div key={i} style={{
                 fontSize: '11px',
                 fontFamily: 'monospace',
                 padding: '3px 6px',
-                background: 'rgba(15,23,42,0.5)',
+                background: isAttack ? 'rgba(239,68,68,0.1)' : 'rgba(15,23,42,0.5)',
                 borderRadius: '4px',
                 borderLeft: `3px solid ${color}`,
               }}>
                 <span style={{ color: '#64748b' }}>[{timeStr}]</span>{' '}
                 <span style={{ color, fontWeight: 600 }}>{evt.action_name.toUpperCase()}</span>{' '}
-                <span style={{ color: '#cbd5e1' }}>{evt.message}</span>
+                <span style={{ color: isAttack ? '#fca5a5' : '#cbd5e1' }}>{msg}</span>
               </div>
             )
           })
