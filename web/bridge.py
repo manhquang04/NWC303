@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import time
 import threading
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from config import (
     ACTION_NAMES,
     CFG,
 )
+
+_TRAIN_STATE_FILE = Path("/tmp/sdnids_train_state.json")
 from detection.flow_collector import FlowCollector, NetworkSnapshot
 from detection.feature_extractor import FeatureExtractor
 from detection.state_builder import StateBuilder, FEATURE_ORDER, FEATURE_MAX
@@ -189,12 +194,34 @@ class WebBridge:
             },
         }
 
+    def _read_train_state(self) -> Optional[Dict[str, Any]]:
+        """Read training state written by agent/train.py."""
+        try:
+            if not _TRAIN_STATE_FILE.exists():
+                return None
+            mtime = os.path.getmtime(_TRAIN_STATE_FILE)
+            if time.time() - mtime > 5.0:
+                return None
+            with open(_TRAIN_STATE_FILE) as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return None
+
     def update_state(
         self,
         action: int = 0,
         ground_truth: str = "unknown",
         reward: float = 0.0,
     ) -> None:
+        # Read training state if available (overrides passed args)
+        train = self._read_train_state()
+        if train is not None:
+            action = train.get("action", action)
+            ground_truth = train.get("ground_truth", ground_truth)
+            reward = train.get("reward", reward)
+            self._episode = train.get("episode", self._episode)
+            self._epsilon = train.get("epsilon", self._epsilon)
+
         with self._lock:
             self._step_count += 1
             self._cumulative_reward += reward

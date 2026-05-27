@@ -3,12 +3,33 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 from pathlib import Path
 
 from config import CFG
 from evaluation.logger import MetricsLogger, setup_logging
+
+_TRAIN_STATE_FILE = Path("/tmp/sdnids_train_state.json")
+
+
+def _write_train_state(action: int, ground_truth: str, reward: float,
+                       episode: int, epsilon: float, step: int,
+                       cumulative_reward: float) -> None:
+    try:
+        with open(_TRAIN_STATE_FILE, "w") as f:
+            json.dump({
+                "action": action,
+                "ground_truth": ground_truth,
+                "reward": reward,
+                "episode": episode,
+                "epsilon": epsilon,
+                "step": step,
+                "cumulative_reward": cumulative_reward,
+            }, f)
+    except OSError:
+        pass
 
 log = logging.getLogger(__name__)
 
@@ -72,6 +93,15 @@ def train_custom(args: argparse.Namespace) -> None:
                 obs = next_obs
                 ep_reward += reward
                 steps += 1
+                _write_train_state(
+                    action=action,
+                    ground_truth=info.get("ground_truth", "unknown"),
+                    reward=reward,
+                    episode=ep,
+                    epsilon=agent.epsilon,
+                    step=steps,
+                    cumulative_reward=ep_reward,
+                )
 
             metrics.log_episode(ep, ep_reward, ep_loss / max(1, steps), agent.epsilon)
             log.info("EP %4d | reward=%+8.2f | eps=%.3f | steps=%d",
@@ -83,6 +113,7 @@ def train_custom(args: argparse.Namespace) -> None:
 
         agent.save(CFG.CHECKPOINT_DIR / "dqn_final.pt")
     finally:
+        _TRAIN_STATE_FILE.unlink(missing_ok=True)
         collector.stop()
         topology.stop()
         env.close()
