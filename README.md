@@ -98,7 +98,7 @@ tar xzf ryu-4.34.tar.gz
 cd ryu-4.34
 sed -i 's/_main_module()._orig_get_script_args = easy_install.get_script_args/pass/' ryu/hooks.py
 pip install . --no-build-isolation
-cd ~/Documents/NWC303
+cd ~/NWC303
 
 # Install remaining dependencies
 pip install -r requirements.txt
