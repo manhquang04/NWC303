@@ -30,7 +30,7 @@ Real-time intrusion detection system for SDN networks using Deep Reinforcement L
 | DRL Framework | PyTorch (custom DQN) + Stable-Baselines3 |
 | RL Environment | Gymnasium |
 | Web Dashboard | FastAPI + React + vis-network |
-| Language | Python 3.10+ |
+| Language | Python 3.11 |
 
 ## Project Structure
 
@@ -79,15 +79,28 @@ Real-time intrusion detection system for SDN networks using Deep Reinforcement L
 
 ### 1. Install (Ubuntu VM required for Mininet)
 
+**Prerequisite: Python 3.11** (Ryu 4.34 is incompatible with Python 3.12+)
+
 ```bash
 # System dependencies
 sudo apt-get update
-sudo apt-get install -y mininet openvswitch-switch python3-pip python3-venv
+sudo apt-get install -y mininet openvswitch-switch python3.11 python3.11-venv python3.11-dev python3-pip
 sudo systemctl start openvswitch-switch
 
-# Python environment
-python3 -m venv .venv
+# Python environment (must use python3.11)
+python3.11 -m venv .venv
 source .venv/bin/activate
+
+# Install Ryu (requires patch for setuptools compatibility)
+cd /tmp
+wget https://files.pythonhosted.org/packages/source/r/ryu/ryu-4.34.tar.gz
+tar xzf ryu-4.34.tar.gz
+cd ryu-4.34
+sed -i 's/_main_module()._orig_get_script_args = easy_install.get_script_args/pass/' ryu/hooks.py
+pip install . --no-build-isolation
+cd ~/Documents/NWC303
+
+# Install remaining dependencies
 pip install -r requirements.txt
 
 # Web frontend
@@ -160,4 +173,4 @@ Run `python3 main.py web` and open `http://localhost:8000`:
 - **Action Timeline** — Historical action sequence
 - **Event Log** — Real-time attack/isolation events
 
-Deploy to GCP VM: install dependencies, build frontend, run `python3 main.py web --host 0.0.0.0`.
+
