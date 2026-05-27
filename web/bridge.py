@@ -97,8 +97,9 @@ class WebBridge:
 
     def _sniffer_loop(self, iface: str) -> None:
         try:
+            # iface=None means all interfaces on newer scapy
             scapy_sniff(
-                iface=iface,
+                iface=iface if iface != "any" else None,
                 prn=self._process_packet,
                 store=False,
                 stop_filter=lambda _: self._sniffer_stop.is_set(),
