@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+.commandcode/
+*.swp
+*.swo
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Training output
+runs/
+checkpoints/
+data/
+*.pt
+*.zip
+
+# Web frontend
+web/frontend/node_modules/
+web/frontend/dist/
+
+# Environment
+.env
+.env.local

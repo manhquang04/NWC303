@@ -1,0 +1,33 @@
+# ===== SDN / Controller =====
+ryu==4.34
+eventlet==0.35.2
+# Mininet không cài qua pip — phải cài qua apt:
+#   sudo apt-get install mininet
+# Phiên bản đích: mininet==2.3.0
+
+# ===== DRL =====
+gymnasium==0.29.1
+stable-baselines3==2.3.0
+torch==2.2.0
+
+# ===== Network / Attacks =====
+scapy==2.5.0
+
+# ===== Data / Numerical =====
+numpy==1.26.0
+pandas==2.1.0
+
+# ===== Visualization / Logging =====
+matplotlib==3.8.0
+tensorboard==2.15.0
+
+# ===== Web / REST =====
+requests==2.31.0
+flask==3.0.0
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+websockets==12.0
+
+# ===== Testing =====
+pytest==8.1.0
+pytest-mock==3.12.0
