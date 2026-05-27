@@ -160,7 +160,11 @@ class FeatureExtractor:
         return list(new)
 
     def _port_rates(self, snap: NetworkSnapshot, dpid: int, dt: float):
-        ports = snap.port_stats.get(dpid, [])
+        raw = snap.port_stats.get(dpid, [])
+        if isinstance(raw, dict):
+            ports = list(raw.values())
+        else:
+            ports = raw
         if not ports:
             return 0.0, 0.0
         best = max(ports, key=lambda p: p.get("rx_bytes", 0))
