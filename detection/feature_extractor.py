@@ -165,9 +165,16 @@ class FeatureExtractor:
             ports = list(raw.values())
         else:
             ports = raw
-        if not ports:
+        # Flatten nested lists
+        flat = []
+        for p in ports:
+            if isinstance(p, dict):
+                flat.append(p)
+            elif isinstance(p, list):
+                flat.extend(x for x in p if isinstance(x, dict))
+        if not flat:
             return 0.0, 0.0
-        best = max(ports, key=lambda p: p.get("rx_bytes", 0))
+        best = max(flat, key=lambda p: p.get("rx_bytes", 0))
         port_no = best.get("port_no", 0)
         key_rx = f"{dpid}:{port_no}:rx"
         key_tx = f"{dpid}:{port_no}:tx"
