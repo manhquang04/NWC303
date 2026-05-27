@@ -11,7 +11,7 @@ build/
 # Virtual env
 .venv/
 venv/
-env/
+
 
 # IDE
 .idea/

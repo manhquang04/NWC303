@@ -3,7 +3,7 @@ import type { DashboardState } from '../types'
 const FEATURE_LABELS: Record<string, string> = {
   arp_request_rate: 'ARP Req Rate',
   arp_reply_rate: 'ARP Reply Rate',
-  mac_ip_mismatch: 'MAC-IP Mismatch',
+  mac_ip_mismatch_count: 'MAC-IP Mismatch',
   new_mac_rate: 'New MAC Rate',
   ssid_beacon_count: 'SSID Beacon',
   unknown_ssid_count: 'Unknown SSID',
@@ -19,8 +19,8 @@ const FEATURE_LABELS: Record<string, string> = {
   packet_size_std: 'Pkt Size σ',
   inter_arrival_mean: 'Inter-arr μ',
   active_host_count: 'Active Hosts',
-  suspicious_port: 'Susp. Port',
-  time_since_alert: 'Since Alert',
+  suspicious_port_flag: 'Susp. Port',
+  time_since_last_alert: 'Since Alert',
 }
 
 interface Props {

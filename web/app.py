@@ -21,6 +21,8 @@ log = logging.getLogger(__name__)
 
 app = FastAPI(title="SDN-DRL-IDS Dashboard", version="1.0.0")
 
+_poll_task: Optional[asyncio.Task] = None
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -39,6 +41,38 @@ def set_bridge(bridge) -> None:
 
 def get_bridge():
     return _bridge
+
+
+async def _poll_loop() -> None:
+    """Background task: poll FlowCollector and update bridge state every 500ms."""
+    while True:
+        try:
+            bridge = get_bridge()
+            if bridge is not None and bridge.flow_collector is not None:
+                snap = bridge.flow_collector.get_latest()
+                if snap is not None:
+                    bridge.update_state()
+        except Exception:
+            log.debug("Poll loop iteration failed", exc_info=True)
+        await asyncio.sleep(0.5)
+
+
+@app.on_event("startup")
+async def start_poll_loop() -> None:
+    global _poll_task
+    _poll_task = asyncio.create_task(_poll_loop())
+    log.info("Background poll loop started.")
+
+
+@app.on_event("shutdown")
+async def stop_poll_loop() -> None:
+    global _poll_task
+    if _poll_task is not None:
+        _poll_task.cancel()
+        try:
+            await _poll_task
+        except asyncio.CancelledError:
+            pass
 
 
 class ConnectionManager:
