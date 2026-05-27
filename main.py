@@ -61,7 +61,8 @@ def _cmd_web(rest: list[str]) -> int:
             isolator = Isolator()
             bridge.flow_collector = collector
             bridge.isolator = isolator
-            log.info("SDN modules connected (FlowCollector + Isolator).")
+            bridge.start_sniffer(iface="any")
+            log.info("SDN modules connected (FlowCollector + Isolator + Sniffer).")
         except Exception as exc:
             log.warning("Cannot connect SDN modules: %s — running in demo mode.", exc)
 

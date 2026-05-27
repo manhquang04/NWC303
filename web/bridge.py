@@ -20,6 +20,12 @@ from evaluation.metrics import MetricsCalculator, StepRecord, MetricsReport
 
 log = logging.getLogger(__name__)
 
+try:
+    from scapy.all import sniff as scapy_sniff, IP, ARP, TCP, UDP, ICMP, Ether
+    _HAS_SCAPY = True
+except ImportError:
+    _HAS_SCAPY = False
+
 
 @dataclass
 class DashboardState:
@@ -69,6 +75,59 @@ class WebBridge:
         self._cumulative_reward = 0.0
 
         self._topology_info = self._build_topology_info()
+        self._sniffer_thread: Optional[threading.Thread] = None
+        self._sniffer_stop = threading.Event()
+
+    def start_sniffer(self, iface: str = "any") -> None:
+        """Start background packet sniffer to feed feature extractor callbacks."""
+        if not _HAS_SCAPY:
+            log.warning("Scapy not available — sniffer disabled, features will be limited.")
+            return
+        if self._sniffer_thread is not None and self._sniffer_thread.is_alive():
+            return
+        self._sniffer_stop.clear()
+        self._sniffer_thread = threading.Thread(
+            target=self._sniffer_loop, args=(iface,), name="PacketSniffer", daemon=True
+        )
+        self._sniffer_thread.start()
+        log.info("Packet sniffer started on iface=%s", iface)
+
+    def stop_sniffer(self) -> None:
+        self._sniffer_stop.set()
+
+    def _sniffer_loop(self, iface: str) -> None:
+        try:
+            scapy_sniff(
+                iface=iface,
+                prn=self._process_packet,
+                store=False,
+                stop_filter=lambda _: self._sniffer_stop.is_set(),
+            )
+        except Exception as exc:
+            log.warning("Sniffer stopped: %s", exc)
+
+    def _process_packet(self, pkt) -> None:
+        try:
+            size = len(pkt)
+            dst_ip = None
+            if pkt.haslayer(IP):
+                dst_ip = pkt[IP].dst
+            self.feature_extractor.on_packet(size, dst_ip)
+
+            if pkt.haslayer(ARP):
+                opcode = pkt[ARP].op
+                if opcode == 1:
+                    self.feature_extractor.on_arp_request()
+                elif opcode == 2:
+                    self.feature_extractor.on_arp_reply()
+
+            if pkt.haslayer(ICMP):
+                self.feature_extractor.on_icmp()
+
+            if pkt.haslayer(TCP) and pkt[TCP].flags == "S":
+                self.feature_extractor.on_tcp_syn()
+        except Exception:
+            pass
 
     def _build_topology_info(self) -> Dict[str, Any]:
         num_switches = CFG.topology.num_switches
