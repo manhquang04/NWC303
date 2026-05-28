@@ -1,83 +1,62 @@
 import type { ActionHistoryEntry } from '../types'
 
 const ACTION_COLORS: Record<string, string> = {
-  allow: '#22c55e',
-  flag: '#eab308',
-  block: '#ef4444',
-  isolate: '#a855f7',
+  allow: '#22c55e', flag: '#eab308', block: '#ef4444', isolate: '#a855f7',
 }
 
-interface Props {
-  history: ActionHistoryEntry[]
-}
+interface Props { history: ActionHistoryEntry[] }
 
 export default function ActionTimeline({ history }: Props) {
-  const recent = history.slice(-80)
+  const recent = history.slice(-100)
 
   return (
     <div style={{
-      background: '#1e293b',
-      borderRadius: '8px',
-      border: '1px solid #334155',
-      padding: '16px',
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
+      background: '#111827', borderRadius: '10px', border: '1px solid #1e293b',
+      padding: '14px', height: '100%',
+      display: 'flex', flexDirection: 'column',
     }}>
-      <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: '#38bdf8' }}>
-        Action Timeline
+      <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: '#38bdf8', letterSpacing: '0.5px' }}>
+        ACTION TIMELINE
       </div>
       <div style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'flex-end',
-        gap: '2px',
-        overflow: 'hidden',
+        flex: 1, display: 'flex', alignItems: 'flex-end', gap: '1px', overflow: 'hidden',
       }}>
         {recent.map((entry, i) => {
-          const color = ACTION_COLORS[entry.action_name] || '#475569'
+          const color = ACTION_COLORS[entry.action_name] || '#374151'
+          const isAttack = entry.ground_truth === 'attack'
           return (
             <div
               key={i}
-              title={`Step ${entry.step}\nAction: ${entry.action_name}\nGT: ${entry.ground_truth}\nReward: ${(entry.reward ?? 0).toFixed(1)}`}
+              title={`Step ${entry.step}\nAction: ${entry.action_name}\nGround Truth: ${entry.ground_truth}\nReward: ${(entry.reward ?? 0).toFixed(1)}`}
               style={{
-                flex: 1,
-                minWidth: '4px',
-                maxWidth: '12px',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'flex-end',
+                flex: 1, minWidth: '3px', maxWidth: '8px', height: '100%',
+                display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
               }}
             >
               <div style={{
-                height: entry.action === 0 ? '30%' : entry.action === 1 ? '50%' : '80%',
+                height: entry.action === 0 ? '20%' : entry.action === 1 ? '45%' : entry.action === 2 ? '70%' : '90%',
                 background: color,
-                borderRadius: '2px 2px 0 0',
-                transition: 'height 0.2s ease',
-                opacity: entry.ground_truth === 'attack' ? 1 : 0.7,
+                borderRadius: '1px 1px 0 0',
+                opacity: isAttack ? 1 : 0.6,
+                boxShadow: isAttack && entry.action > 0 ? `0 0 6px ${color}` : 'none',
               }} />
             </div>
           )
         })}
       </div>
-      {/* Labels */}
       <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        marginTop: '6px',
-        fontSize: '10px',
-        color: '#64748b',
+        display: 'flex', justifyContent: 'space-between', marginTop: '6px',
+        fontSize: '9px', color: '#4b5563',
       }}>
-        <span>← older</span>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <span>older</span>
+        <div style={{ display: 'flex', gap: '8px' }}>
           {Object.entries(ACTION_COLORS).map(([name, color]) => (
             <span key={name}>
               <span style={{ color }}>■</span> {name}
             </span>
           ))}
         </div>
-        <span>newest →</span>
+        <span>newest</span>
       </div>
     </div>
   )

@@ -8,39 +8,6 @@ import EventLog from './components/EventLog'
 import ControlPanel from './components/ControlPanel'
 import type { TopologyData, ActionHistoryEntry } from './types'
 
-const s = {
-  container: {
-    display: 'flex', flexDirection: 'column', height: '100vh',
-    background: '#0f172a', color: '#e2e8f0',
-  } as React.CSSProperties,
-  header: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '12px 24px', background: '#1e293b', borderBottom: '1px solid #334155',
-  } as React.CSSProperties,
-  title: { fontSize: '20px', fontWeight: 700, color: '#38bdf8' } as React.CSSProperties,
-  status: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' } as React.CSSProperties,
-  body: {
-    display: 'grid', gridTemplateColumns: '1fr 320px', gridTemplateRows: '1fr 200px',
-    gap: '12px', padding: '12px', flex: 1, overflow: 'hidden',
-  } as React.CSSProperties,
-  topLeft: { display: 'flex', flexDirection: 'column', gap: '12px', overflow: 'hidden' } as React.CSSProperties,
-  mainGraph: {
-    flex: 1, background: '#1e293b', borderRadius: '8px',
-    border: '1px solid #334155', overflow: 'hidden', minHeight: 0,
-  } as React.CSSProperties,
-  rightPanel: {
-    display: 'flex', flexDirection: 'column', gap: '12px', overflow: 'auto', gridRow: '1 / 3',
-  } as React.CSSProperties,
-  bottomLeft: { overflow: 'hidden' } as React.CSSProperties,
-}
-
-function Dot({ connected }: { connected: boolean }) {
-  return <div style={{
-    width: 8, height: 8, borderRadius: '50%',
-    background: connected ? '#22c55e' : '#ef4444',
-  }} />
-}
-
 export default function App() {
   const { state, connected } = useWebSocket()
   const [topology, setTopology] = useState<TopologyData | null>(null)
@@ -56,39 +23,82 @@ export default function App() {
     }
   }, [state?.step_count])
 
+  const isAttack = state?.ground_truth === 'attack'
+
   return (
-    <div style={s.container}>
-      <div style={s.header}>
-        <div style={s.title}>SDN DRL-IDS Dashboard</div>
+    <div style={{
+      display: 'flex', flexDirection: 'column', height: '100vh',
+      background: '#0a0e1a', color: '#e2e8f0',
+      fontFamily: "'Inter', -apple-system, sans-serif",
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 20px',
+        background: isAttack ? 'linear-gradient(90deg, #1a0a0a, #1e293b)' : '#151b2e',
+        borderBottom: `2px solid ${isAttack ? '#ef4444' : '#1e293b'}`,
+        transition: 'all 0.5s ease',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ fontSize: '18px', fontWeight: 800, color: '#38bdf8', letterSpacing: '-0.5px' }}>
+            SDN DRL-IDS
+          </div>
+          <div style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: connected ? '#22c55e' : '#ef4444',
+            boxShadow: connected ? '0 0 8px #22c55e' : '0 0 8px #ef4444',
+          }} />
+          <span style={{ fontSize: '12px', color: connected ? '#86efac' : '#fca5a5' }}>
+            {connected ? 'LIVE' : 'OFFLINE'}
+          </span>
+        </div>
+
         <ControlPanel />
-        <div style={s.status}>
-          <Dot connected={connected} />
-          <span>{connected ? 'Connected' : 'Disconnected'}</span>
-          {state && (
-            <>
-              <span style={{ color: '#64748b' }}>|</span>
-              <span>Step: {state.step_count}</span>
-              <span style={{ color: '#64748b' }}>|</span>
-              <span>Ep: {state.episode}</span>
-              <span style={{ color: '#64748b' }}>|</span>
-              <span>ε: {state.epsilon.toFixed(3)}</span>
-            </>
+
+        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#94a3b8' }}>
+          <span>Step <b style={{ color: '#e2e8f0' }}>{state?.step_count ?? 0}</b></span>
+          <span>Episode <b style={{ color: '#e2e8f0' }}>{state?.episode ?? 0}</b></span>
+          <span>Epsilon <b style={{ color: '#e2e8f0' }}>{(state?.epsilon ?? 0).toFixed(3)}</b></span>
+          {isAttack && (
+            <span style={{
+              color: '#ef4444', fontWeight: 700,
+              animation: 'pulse 1s ease-in-out infinite',
+            }}>
+              ATTACK DETECTED
+            </span>
           )}
         </div>
       </div>
 
-      <div style={s.body}>
-        <div style={s.topLeft}>
-          <div style={s.mainGraph}>
-            {topology && state && <TopologyGraph topology={topology} state={state} />}
-          </div>
+      {/* Main Body */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 300px',
+        gridTemplateRows: '1fr 180px',
+        gap: '10px', padding: '10px', flex: 1, overflow: 'hidden',
+      }}>
+        {/* Topology Graph - main area */}
+        <div style={{
+          background: '#111827', borderRadius: '10px',
+          border: `1px solid ${isAttack ? '#7f1d1d' : '#1e293b'}`,
+          overflow: 'hidden', minHeight: 0,
+          transition: 'border-color 0.5s ease',
+        }}>
+          {topology && state && <TopologyGraph topology={topology} state={state} />}
         </div>
-        <div style={s.rightPanel}>
+
+        {/* Right Panel */}
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: '10px',
+          overflow: 'auto', gridRow: '1 / 3',
+        }}>
           <MetricsPanel metrics={state?.metrics} />
           <FeatureChart state={state} />
           <EventLog events={state?.recent_events} />
         </div>
-        <div style={s.bottomLeft}>
+
+        {/* Bottom - Action Timeline */}
+        <div style={{ overflow: 'hidden' }}>
           <ActionTimeline history={history} />
         </div>
       </div>

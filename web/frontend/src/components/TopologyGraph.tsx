@@ -1,19 +1,12 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Network, DataSet } from 'vis-network/standalone'
 import type { TopologyData, DashboardState } from '../types'
 
 const ACTION_COLORS: Record<number, string> = {
-  0: '#22c55e', // allow - green
-  1: '#eab308', // flag - yellow
-  2: '#ef4444', // block - red
-  3: '#a855f7', // isolate - purple
+  0: '#22c55e', 1: '#eab308', 2: '#ef4444', 3: '#a855f7',
 }
-
 const ACTION_LABELS: Record<number, string> = {
-  0: 'ALLOW',
-  1: 'FLAG',
-  2: 'BLOCK',
-  3: 'ISOLATE',
+  0: 'ALLOW', 1: 'FLAG', 2: 'BLOCK', 3: 'ISOLATE',
 }
 
 interface Props {
@@ -25,64 +18,73 @@ export default function TopologyGraph({ topology, state }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const networkRef = useRef<Network | null>(null)
   const nodesRef = useRef<DataSet<any> | null>(null)
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null)
 
   useEffect(() => {
     if (!containerRef.current) return
 
     const nodes = new DataSet(
-      topology.nodes.map(n => ({
-        id: n.id,
-        label: n.label,
-        shape: n.type === 'switch' ? 'diamond' : 'dot',
-        size: n.type === 'switch' ? 30 : 20,
-        color: {
-          background: n.type === 'switch' ? '#475569' : '#38bdf8',
-          border: '#64748b',
-          highlight: { background: '#818cf8', border: '#6366f1' },
-        },
-        font: { color: '#e2e8f0', size: 12 },
-        title: n.ip ? `${n.label}\nIP: ${n.ip}\nRole: ${n.role}` : n.label,
-        group: n.group,
-      }))
+      topology.nodes.map(n => {
+        const isSwitch = n.type === 'switch'
+        return {
+          id: n.id,
+          label: n.label,
+          shape: isSwitch ? 'diamond' : 'dot',
+          size: isSwitch ? 35 : 22,
+          color: {
+            background: isSwitch ? '#374151' : '#38bdf8',
+            border: isSwitch ? '#6b7280' : '#0ea5e9',
+            highlight: { background: '#818cf8', border: '#6366f1' },
+          },
+          font: {
+            color: '#e2e8f0', size: 12, face: 'Inter, sans-serif',
+            bold: { color: '#fff' },
+          },
+          title: n.ip
+            ? `${n.label}\nIP: ${n.ip}\nRole: ${n.role}\nMAC: ${n.role === 'rogue_ap' ? 'de:ad:be:ef:00:05' : n.role === 'arp_spoofer' ? 'de:ad:be:ef:00:06' : 'auto'}`
+            : `${n.label}\nOpenFlow 1.3`,
+          group: n.group,
+          borderWidth: 2,
+          shadow: { enabled: true, color: 'rgba(0,0,0,0.3)', size: 10 },
+        }
+      })
     )
     nodesRef.current = nodes
 
     const edges = new DataSet(
       topology.edges.map((e, i) => ({
-        id: i,
-        from: e.from,
-        to: e.to,
-        label: e.label,
-        color: { color: '#475569', highlight: '#64748b' },
-        font: { color: '#94a3b8', size: 10 },
-        width: 2,
+        id: i, from: e.from, to: e.to, label: e.label,
+        color: { color: '#374151', highlight: '#6b7280' },
+        font: { color: '#6b7280', size: 9, strokeWidth: 0 },
+        width: 2, smooth: { enabled: true, type: 'continuous', roundness: 0.5 },
       }))
     )
 
     const network = new Network(
-      containerRef.current,
-      { nodes, edges },
+      containerRef.current, { nodes, edges },
       {
         physics: {
-          enabled: true,
-          solver: 'forceAtlas2Based',
-          forceAtlas2Based: {
-            gravitationalConstant: -50,
-            springLength: 120,
-            springConstant: 0.08,
-          },
+          enabled: true, solver: 'forceAtlas2Based',
+          forceAtlas2Based: { gravitationalConstant: -60, springLength: 130, springConstant: 0.08 },
           stabilization: { iterations: 100 },
         },
-        interaction: { hover: true, tooltipDelay: 200 },
-        nodes: { borderWidth: 2, shadow: true },
+        interaction: { hover: true, tooltipDelay: 100, zoomView: true, dragView: true },
+        nodes: { borderWidth: 2 },
         edges: { smooth: { enabled: true, type: 'continuous', roundness: 0.5 } },
       }
     )
     networkRef.current = network
+
+    network.on('hoverNode', (params: any) => {
+      const nodeId = params.node
+      setHoveredNode(nodeId)
+    })
+    network.on('blurNode', () => setHoveredNode(null))
+
     return () => { network.destroy() }
   }, [topology])
 
-  // Update node colors based on attack state and action
+  // Update colors based on attack/action state
   useEffect(() => {
     if (!nodesRef.current) return
 
@@ -94,79 +96,125 @@ export default function TopologyGraph({ topology, state }: Props) {
       if (n.type !== 'host') return
 
       const isAttacker = n.role === 'rogue_ap' || n.role === 'arp_spoofer'
-      let color = '#38bdf8' // default blue
-      let borderColor = '#64748b'
-      let label = n.label
+      let bg = '#38bdf8'
+      let border = '#0ea5e9'
       let borderWidth = 2
+      let label = n.label
+      let shadow: any = { enabled: true, color: 'rgba(0,0,0,0.3)', size: 10 }
 
       if (isAttacker && isAttack) {
         if (action > 0) {
-          // Agent acted: show action color
-          color = ACTION_COLORS[action]
-          borderColor = '#fbbf24'
-          label = `${n.label}\n[${ACTION_LABELS[action]}]`
+          // Agent acted on attacker
+          bg = ACTION_COLORS[action]
+          border = '#fbbf24'
           borderWidth = 4
+          label = `${n.label}\n[${ACTION_LABELS[action]}]`
+          shadow = { enabled: true, color: ACTION_COLORS[action], size: 20 }
         } else {
-          // Attack happening, agent hasn't acted: red/orange pulse
-          color = n.role === 'rogue_ap' ? '#ef4444' : '#f97316'
-          borderColor = '#fbbf24'
+          // Attack happening, no action yet
+          bg = n.role === 'rogue_ap' ? '#dc2626' : '#ea580c'
+          border = '#fbbf24'
+          borderWidth = 4
           label = n.role === 'rogue_ap'
             ? `${n.label}\nROGUE AP`
-            : `${n.label}\nSPOOFING`
-          borderWidth = 4
+            : `${n.label}\nARP SPOOF`
+          shadow = { enabled: true, color: bg, size: 25 }
         }
       } else if (isAttack && !isAttacker) {
-        // Normal host during attack: subtle warning border
-        borderColor = '#f97316'
+        // Normal host during attack
+        border = '#f97316'
+        shadow = { enabled: true, color: 'rgba(249,115,22,0.3)', size: 15 }
       }
 
       updates.push({
-        id: n.id,
-        label,
-        color: { background: color, border: borderColor },
-        borderWidth,
+        id: n.id, label,
+        color: { background: bg, border },
+        borderWidth, shadow,
       })
     })
 
-    if (updates.length > 0) {
-      nodesRef.current.update(updates)
-    }
+    // Update switch colors
+    topology.nodes.forEach(n => {
+      if (n.type !== 'switch') return
+      updates.push({
+        id: n.id,
+        color: {
+          background: isAttack ? '#1f2937' : '#374151',
+          border: isAttack ? '#ef4444' : '#6b7280',
+        },
+        shadow: { enabled: isAttack, color: 'rgba(239,68,68,0.2)', size: 15 },
+      })
+    })
+
+    if (updates.length > 0) nodesRef.current.update(updates)
   }, [state.current_action, state.ground_truth, topology.nodes])
+
+  const isAttack = state.ground_truth === 'attack'
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* Attack Alert Banner */}
-      {state.ground_truth === 'attack' && (
+      {/* Attack Alert */}
+      {isAttack && (
         <div style={{
-          position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
+          position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
           background: state.current_action > 0
-            ? 'rgba(168,85,247,0.9)' : 'rgba(239,68,68,0.9)',
-          padding: '8px 20px', borderRadius: '8px', fontSize: '14px',
+            ? 'linear-gradient(135deg, rgba(168,85,247,0.9), rgba(139,92,246,0.9))'
+            : 'linear-gradient(135deg, rgba(239,68,68,0.9), rgba(220,38,38,0.9))',
+          padding: '8px 24px', borderRadius: '20px', fontSize: '13px',
           fontWeight: 700, color: '#fff', textAlign: 'center',
-          boxShadow: '0 0 20px rgba(239,68,68,0.5)',
-          animation: 'pulse 1.5s ease-in-out infinite',
+          boxShadow: state.current_action > 0
+            ? '0 0 30px rgba(168,85,247,0.5)' : '0 0 30px rgba(239,68,68,0.5)',
+          letterSpacing: '1px',
         }}>
           {state.current_action > 0
-            ? `ATTACK DETECTED - ${ACTION_LABELS[state.current_action].toUpperCase()}`
-            : 'ATTACK IN PROGRESS - MONITORING'}
+            ? `${ACTION_LABELS[state.current_action]} — ATTACK MITIGATED`
+            : 'ATTACK IN PROGRESS — MONITORING'}
+        </div>
+      )}
+
+      {/* Node Info Tooltip */}
+      {hoveredNode && (
+        <div style={{
+          position: 'absolute', bottom: 50, right: 10,
+          background: 'rgba(15,23,42,0.95)', padding: '10px 14px',
+          borderRadius: '8px', fontSize: '11px', lineHeight: 1.6,
+          border: '1px solid #334155', minWidth: '160px',
+        }}>
+          <div style={{ fontWeight: 700, color: '#38bdf8', marginBottom: '4px' }}>{hoveredNode}</div>
+          {(() => {
+            const node = topology.nodes.find(n => n.id === hoveredNode)
+            if (!node) return null
+            if (node.type === 'switch') {
+              return <div style={{ color: '#94a3b8' }}>OpenFlow 1.3 Switch</div>
+            }
+            return (
+              <>
+                <div style={{ color: '#94a3b8' }}>IP: {node.ip}</div>
+                <div style={{ color: '#94a3b8' }}>Role: {node.role}</div>
+                {node.role === 'rogue_ap' && <div style={{ color: '#ef4444' }}>Fake SSID: FreeWiFi-Evil</div>}
+                {node.role === 'arp_spoofer' && <div style={{ color: '#f97316' }}>Spoofing: 10.0.0.1</div>}
+              </>
+            )
+          })()}
         </div>
       )}
 
       {/* Legend */}
       <div style={{
         position: 'absolute', bottom: 8, left: 8,
-        background: 'rgba(15,23,42,0.9)', padding: '8px 12px',
-        borderRadius: '6px', fontSize: '11px', display: 'flex', gap: '12px',
+        background: 'rgba(15,23,42,0.9)', padding: '6px 10px',
+        borderRadius: '6px', fontSize: '10px', display: 'flex', gap: '10px',
+        color: '#94a3b8',
       }}>
         <span><span style={{ color: '#22c55e' }}>●</span> Allow</span>
         <span><span style={{ color: '#eab308' }}>●</span> Flag</span>
         <span><span style={{ color: '#ef4444' }}>●</span> Block</span>
         <span><span style={{ color: '#a855f7' }}>●</span> Isolate</span>
-        <span style={{ color: '#64748b' }}>|</span>
-        <span><span style={{ color: '#ef4444' }}>●</span> Rogue AP</span>
-        <span><span style={{ color: '#f97316' }}>●</span> ARP Spoofer</span>
+        <span style={{ color: '#334155' }}>|</span>
+        <span><span style={{ color: '#dc2626' }}>●</span> Rogue AP</span>
+        <span><span style={{ color: '#ea580c' }}>●</span> Spoofer</span>
       </div>
     </div>
   )
