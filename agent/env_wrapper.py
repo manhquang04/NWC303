@@ -126,6 +126,12 @@ class SDNIDSEnv(gym.Env):
         if action in (ACTION_BLOCK, ACTION_ISOLATE):
             snap = self.flow_collector.get_latest() if self.flow_collector else None
             target = self.target_selector.select(snap, self._last_features)
+            if target is None and self.mode == "training" and hasattr(self.attack_log, "active_types_at"):
+                active_types = self.attack_log.active_types_at(time.time())
+                for attack_type in active_types:
+                    target = self.target_selector.from_attack_type(attack_type)
+                    if target is not None:
+                        break
             self._last_target = target
             if target is not None:
                 self.isolator.set_target(target.dpid, target.port)

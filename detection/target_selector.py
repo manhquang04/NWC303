@@ -137,6 +137,28 @@ class TargetSelector:
 
         return max(candidates.values(), key=lambda c: c.score)
 
+    def from_attack_type(self, attack_type: str) -> Optional[IsolationTarget]:
+        """Fallback target for the known Mininet training topology."""
+        if "ARPSpoofAttack" in attack_type or "arp_spoof" in attack_type:
+            host_idx = self.spoofer_host_idx
+            normalized = "arp_spoof"
+        elif "RogueAPAttack" in attack_type or "rogue_ap" in attack_type:
+            host_idx = self.rogue_host_idx
+            normalized = "rogue_ap"
+        else:
+            return None
+
+        dpid, port = mininet_host_location(host_idx)
+        return IsolationTarget(
+            dpid=dpid,
+            port=port,
+            score=0.5,
+            reason="known_mininet_attacker",
+            attack_type=normalized,
+            mac=_mininet_mac(host_idx),
+            metadata={"host": f"h{host_idx}"},
+        )
+
 
 def _normalize_arp_table(raw: Dict[str, str]) -> Dict[str, str]:
     return {str(ip): str(mac).lower() for ip, mac in (raw or {}).items()}
@@ -200,3 +222,10 @@ def _iter_port_dicts(raw: Any) -> Iterable[Dict[str, Any]]:
 
 def _mininet_mac(host_idx: int) -> str:
     return f"00:00:00:00:00:{int(host_idx):02x}"
+
+
+def mininet_host_location(host_idx: int) -> Tuple[int, int]:
+    hosts_per_sw = max(1, CFG.topology.num_hosts // CFG.topology.num_switches)
+    dpid = min((int(host_idx) - 1) // hosts_per_sw + 1, CFG.topology.num_switches)
+    port = (int(host_idx) - 1) % hosts_per_sw + 1
+    return dpid, port

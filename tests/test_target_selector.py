@@ -96,3 +96,21 @@ def test_select_falls_back_to_highest_rx_port_when_suspicious():
     assert target.dpid == 1
     assert target.port == 2
     assert target.reason == "highest_rx_port"
+
+
+def test_known_mininet_attacker_fallback_for_arp_spoof():
+    target = TargetSelector().from_attack_type("ARPSpoofAttack")
+
+    assert target is not None
+    assert target.dpid == 3
+    assert target.port == 2
+    assert target.reason == "known_mininet_attacker"
+
+
+def test_known_mininet_attacker_fallback_for_rogue_ap():
+    target = TargetSelector().from_attack_type("RogueAPAttack")
+
+    assert target is not None
+    assert target.dpid == 3
+    assert target.port == 1
+    assert target.reason == "known_mininet_attacker"
