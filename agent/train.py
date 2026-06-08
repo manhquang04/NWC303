@@ -114,11 +114,13 @@ def build_env(attack_ratio: float = 0.4, max_steps: int = CFG.dqn.max_steps_per_
     rogue_ap = RogueAPAttack(
         iface=rogue_iface,
         on_event=attack_log.append,
+        host=rogue_host,
     )
     arp_spoof = ARPSpoofAttack(
         iface=spoofer_iface,
         attacker_mac=spoofer_mac,
         on_event=attack_log.append,
+        host=spoofer_host,
     )
 
     attacks = [rogue_ap, arp_spoof]

