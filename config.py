@@ -114,6 +114,17 @@ class IsolationConfig:
 
 
 @dataclass(frozen=True)
+class RealTestbedConfig:
+    """Defaults for a small physical/VM OpenFlow testbed."""
+
+    dpids: Tuple[int, ...] = (1,)
+    poll_steps: int = 120
+    apply_actions: bool = False
+    default_iface: str = "any"
+    results_path: Path = LOG_DIR / "realtest_results.csv"
+
+
+@dataclass(frozen=True)
 class LoggingConfig:
     log_level: str = "INFO"
     log_format: str = "[%(asctime)s] %(name)s [%(levelname)s] %(message)s"
@@ -132,6 +143,7 @@ class GlobalConfig:
     dqn: DQNConfig = field(default_factory=DQNConfig)
     reward: RewardConfig = field(default_factory=RewardConfig)
     isolation: IsolationConfig = field(default_factory=IsolationConfig)
+    realtest: RealTestbedConfig = field(default_factory=RealTestbedConfig)
     logging_cfg: LoggingConfig = field(default_factory=LoggingConfig)
 
 

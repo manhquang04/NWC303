@@ -43,3 +43,16 @@ def test_agent_learn_no_crash_with_few_samples():
     agent = DQNAgent(state_dim=20, num_actions=4, device="cpu")
     loss = agent.learn()
     assert loss == 0.0
+
+
+def test_agent_save_load_checkpoint(tmp_path):
+    path = tmp_path / "dqn.pt"
+    agent = DQNAgent(state_dim=20, num_actions=4, device="cpu")
+    agent.epsilon = 0.25
+    agent.save(path)
+
+    loaded = DQNAgent(state_dim=20, num_actions=4, device="cpu")
+    loaded.load(path)
+
+    assert path.exists()
+    assert loaded.epsilon == 0.25

@@ -13,7 +13,7 @@ matplotlib.use("Agg")  # headless
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-from config import CFG  # noqa: E402
+from config import CFG, LOG_DIR  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ def plot_confusion_matrix(
 
 def plot_action_distribution(
     actions: Sequence[int],
-    out_path: Path = CFG.LOG_DIR / "action_dist.png",
+    out_path: Path = LOG_DIR / "action_dist.png",
 ) -> Path:
     from config import ACTION_NAMES
     counts = [int((np.array(actions) == i).sum()) for i in range(len(ACTION_NAMES))]

@@ -23,6 +23,18 @@ def _cmd_evaluate(rest: list[str]) -> int:
     return eval_main()
 
 
+def _cmd_experiment(rest: list[str]) -> int:
+    from evaluation.metrics import main as eval_main
+    sys.argv = ["experiment", "--scenario", "all", "--agent", "all", *rest]
+    return eval_main()
+
+
+def _cmd_realtest(rest: list[str]) -> int:
+    from evaluation.realtest import main as realtest_main
+    sys.argv = ["realtest", *rest]
+    return realtest_main()
+
+
 def _cmd_topo(_rest: list[str]) -> int:
     from env.topology import main as topo_main
     topo_main()
@@ -41,6 +53,9 @@ def _cmd_web(rest: list[str]) -> int:
     p = argparse.ArgumentParser(description="Start web dashboard.")
     p.add_argument("--host", default="0.0.0.0")
     p.add_argument("--port", type=int, default=8000)
+    p.add_argument("--ryu-url", default=None)
+    p.add_argument("--dpids", default="1,2,3")
+    p.add_argument("--sniff-iface", default="any")
     p.add_argument("--no-sdn", action="store_true",
                    help="Run without Mininet connection (demo mode).")
     args, _ = p.parse_known_args(rest)
@@ -56,13 +71,17 @@ def _cmd_web(rest: list[str]) -> int:
             from detection.flow_collector import FlowCollector
             from isolation.isolator import Isolator
 
-            collector = FlowCollector(dpids=[1, 2, 3])
+            dpids = [int(x.strip(), 0) for x in args.dpids.split(",") if x.strip()]
+            collector_kwargs = {"dpids": dpids}
+            if args.ryu_url:
+                collector_kwargs["base_url"] = args.ryu_url
+            collector = FlowCollector(**collector_kwargs)
             collector.start()
-            isolator = Isolator()
+            isolator = Isolator(base_url=args.ryu_url) if args.ryu_url else Isolator()
             bridge.flow_collector = collector
             bridge.isolator = isolator
-            bridge.start_sniffer(iface="any")
-            log.info("SDN modules connected (FlowCollector + Isolator + Sniffer).")
+            bridge.start_sniffer(iface=args.sniff_iface)
+            log.info("SDN modules connected (FlowCollector + Isolator + Sniffer), dpids=%s.", dpids)
         except Exception as exc:
             log.warning("Cannot connect SDN modules: %s — running in demo mode.", exc)
 
@@ -74,6 +93,8 @@ def _cmd_web(rest: list[str]) -> int:
 COMMANDS = {
     "train": _cmd_train,
     "evaluate": _cmd_evaluate,
+    "experiment": _cmd_experiment,
+    "realtest": _cmd_realtest,
     "topo": _cmd_topo,
     "plot": _cmd_plot,
     "web": _cmd_web,

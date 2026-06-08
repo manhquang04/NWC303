@@ -6,8 +6,10 @@ export interface DashboardState {
   current_action: number
   current_action_name: string
   ground_truth: string
+  attack_type: string
   step_reward: number
   step_count: number
+  target?: IsolationTarget | null
   episode: number
   epsilon: number
   cumulative_reward: number
@@ -38,6 +40,18 @@ export interface EventEntry {
   message: string
   action: number
   action_name: string
+  attack_type?: string
+  target?: IsolationTarget | null
+}
+
+export interface IsolationTarget {
+  dpid: number
+  port: number
+  score: number
+  reason: string
+  attack_type: string
+  mac?: string | null
+  metadata?: Record<string, any>
 }
 
 export interface TopologyNode {
@@ -73,7 +87,9 @@ export interface ActionHistoryEntry {
   action: number
   action_name: string
   ground_truth: string
+  attack_type?: string
   reward: number
+  target?: IsolationTarget | null
 }
 
 export interface FeatureInfo {

@@ -20,6 +20,7 @@ _TRAIN_STATE_FILE = Path("/tmp/sdnids_train_state.json")
 from detection.flow_collector import FlowCollector, NetworkSnapshot
 from detection.feature_extractor import FeatureExtractor
 from detection.state_builder import StateBuilder, FEATURE_ORDER, FEATURE_MAX
+from detection.target_selector import TargetSelector, infer_attack_type
 from isolation.isolator import Isolator, IsolationEvent
 from evaluation.metrics import MetricsCalculator, StepRecord, MetricsReport
 
@@ -43,8 +44,10 @@ class DashboardState:
     current_action: int = 0
     current_action_name: str = "allow"
     ground_truth: str = "unknown"
+    attack_type: str = "none"
     step_reward: float = 0.0
     step_count: int = 0
+    target: Optional[Dict[str, Any]] = None
 
     episode: int = 0
     epsilon: float = 0.0
@@ -68,6 +71,7 @@ class WebBridge:
         self.isolator = isolator
         self.feature_extractor = FeatureExtractor()
         self.state_builder = StateBuilder()
+        self.target_selector = TargetSelector()
         self.metrics_calc = MetricsCalculator()
 
         self._lock = threading.Lock()
@@ -78,6 +82,7 @@ class WebBridge:
         self._episode = 0
         self._epsilon = 1.0
         self._cumulative_reward = 0.0
+        self._attack_active = False
 
         self._topology_info = self._build_topology_info()
         self._sniffer_thread: Optional[threading.Thread] = None
@@ -221,6 +226,11 @@ class WebBridge:
             reward = train.get("reward", reward)
             self._episode = train.get("episode", self._episode)
             self._epsilon = train.get("epsilon", self._epsilon)
+            train_attack_type = train.get("attack_type", "none")
+            train_target = train.get("target")
+        else:
+            train_attack_type = "none"
+            train_target = None
 
         with self._lock:
             self._step_count += 1
@@ -235,10 +245,25 @@ class WebBridge:
                 vec = self.state_builder.build(raw_features)
                 state_vector = vec.tolist()
 
+            attack_type = train_attack_type
+            if attack_type in ("", "none", "unknown") and raw_features:
+                attack_type = infer_attack_type(raw_features)
+                if attack_type == "unknown":
+                    attack_type = "none"
+
+            target = train_target
+            if target is None and action in (2, 3):
+                selected = self.target_selector.select(snap, raw_features)
+                target = selected.as_dict() if selected else None
+
             ts = time.time()
             is_attack = ground_truth == "attack"
             took_action = action != 0
             blocked = action in (2, 3)
+
+            if is_attack and not self._attack_active:
+                self.metrics_calc.mark_attack_start(ts)
+            self._attack_active = is_attack
 
             rec = StepRecord(
                 timestamp=ts,
@@ -261,19 +286,23 @@ class WebBridge:
                 "action": action,
                 "action_name": ACTION_NAMES[action],
                 "ground_truth": ground_truth,
+                "attack_type": attack_type,
                 "reward": reward,
+                "target": target,
             }
             self._action_history.append(action_entry)
             if len(self._action_history) > 500:
                 self._action_history = self._action_history[-500:]
 
             if action != 0:
-                event_msg = self._format_event(action, ground_truth, reward, raw_features)
+                event_msg = self._format_event(action, ground_truth, reward, raw_features, target, attack_type)
                 self._event_log.append({
                     "timestamp": ts,
                     "message": event_msg,
                     "action": action,
                     "action_name": ACTION_NAMES[action],
+                    "attack_type": attack_type,
+                    "target": target,
                 })
                 if len(self._event_log) > 200:
                     self._event_log = self._event_log[-200:]
@@ -292,8 +321,10 @@ class WebBridge:
                 current_action=action,
                 current_action_name=ACTION_NAMES[action],
                 ground_truth=ground_truth,
+                attack_type=attack_type,
                 step_reward=reward,
                 step_count=self._step_count,
+                target=target,
                 episode=self._episode,
                 epsilon=self._epsilon,
                 cumulative_reward=self._cumulative_reward,
@@ -305,20 +336,32 @@ class WebBridge:
             )
 
     def _format_event(self, action: int, ground_truth: str, reward: float,
-                      raw_features: Optional[Dict[str, float]] = None) -> str:
+                      raw_features: Optional[Dict[str, float]] = None,
+                      target: Optional[Dict[str, Any]] = None,
+                      attack_type: str = "none") -> str:
         action_name = ACTION_NAMES[action].upper()
         attack_detail = ""
-        if ground_truth == "attack" and raw_features:
-            arp_rate = raw_features.get("arp_reply_rate", 0)
-            beacon = raw_features.get("ssid_beacon_count", 0)
-            if arp_rate > 10:
-                attack_detail = " [ARP Spoofing h6]"
-            elif beacon > 0:
-                attack_detail = " [Rogue AP h5]"
-            else:
+        if ground_truth == "attack":
+            if attack_type and attack_type != "none":
+                attack_detail = f" [{attack_type}]"
+        if ground_truth == "attack":
+            if raw_features and not attack_detail:
+                arp_rate = raw_features.get("arp_reply_rate", 0)
+                beacon = raw_features.get("ssid_beacon_count", 0)
+                if arp_rate > 10:
+                    attack_detail = " [ARP Spoofing h6]"
+                elif beacon > 0:
+                    attack_detail = " [Rogue AP h5]"
+            if not attack_detail:
                 attack_detail = " [Attack]"
         gt_info = f"({ground_truth})" if ground_truth != "unknown" else ""
-        return f"{action_name}{attack_detail} {gt_info} reward={reward:+.1f}"
+        if target:
+            target_info = f" target=s{target.get('dpid')}:p{target.get('port')}"
+        elif action in (2, 3):
+            target_info = " target=no_target"
+        else:
+            target_info = ""
+        return f"{action_name}{attack_detail} {gt_info}{target_info} reward={reward:+.1f}"
 
     def _get_metrics_dict(self) -> Dict[str, float]:
         report = self.metrics_calc.compute(episodes=self._episode)
@@ -402,4 +445,6 @@ class WebBridge:
                 "message": message,
                 "action": action_map.get(action_name, 0),
                 "action_name": action_name,
+                "attack_type": "none",
+                "target": None,
             })

@@ -31,6 +31,8 @@ export default function EventLog({ events }: Props) {
             const timeStr = time.toLocaleTimeString()
             const color = ACTION_COLORS[evt.action_name] || '#4b5563'
             const msg = evt.message || ''
+            const target = evt.target ? ` s${evt.target.dpid}:p${evt.target.port}` : ''
+            const attackType = evt.attack_type && evt.attack_type !== 'none' ? ` ${evt.attack_type}` : ''
             const isAttack = msg.toLowerCase().includes('attack') || msg.toLowerCase().includes('spoof') || msg.toLowerCase().includes('rogue')
             return (
               <div key={i} style={{
@@ -41,6 +43,8 @@ export default function EventLog({ events }: Props) {
               }}>
                 <span style={{ color: '#4b5563' }}>{timeStr}</span>{' '}
                 <span style={{ color, fontWeight: 700, fontSize: '9px' }}>{evt.action_name.toUpperCase()}</span>{' '}
+                {attackType && <span style={{ color: '#fbbf24' }}>{attackType}</span>}{' '}
+                {target && <span style={{ color: '#93c5fd' }}>{target}</span>}{' '}
                 <span style={{ color: isAttack ? '#fca5a5' : '#9ca3af' }}>{msg}</span>
               </div>
             )

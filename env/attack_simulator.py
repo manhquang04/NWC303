@@ -185,6 +185,9 @@ class AttackEventLog:
             return list(self._events)
 
     def is_attack_at(self, ts: float, tolerance: float = 0.5) -> bool:
+        return bool(self.active_types_at(ts=ts, tolerance=tolerance))
+
+    def active_types_at(self, ts: float, tolerance: float = 0.5) -> List[str]:
         with self._lock:
             running: dict[str, float] = {}
             for e in self._events:
@@ -194,4 +197,14 @@ class AttackEventLog:
                     running[e.attack_type] = e.timestamp
                 elif e.action == "stop":
                     running.pop(e.attack_type, None)
-            return bool(running)
+            return sorted(running.keys())
+
+    def latest_attack_start_at(self, ts: float, tolerance: float = 0.5) -> Optional[float]:
+        with self._lock:
+            latest: Optional[float] = None
+            for e in self._events:
+                if e.timestamp > ts + tolerance:
+                    break
+                if e.action == "start":
+                    latest = e.timestamp
+            return latest

@@ -173,4 +173,93 @@ Run `python3 main.py web` and open `http://localhost:8000`:
 - **Action Timeline** — Historical action sequence
 - **Event Log** — Real-time attack/isolation events
 
+## Level-2 Real Testbed for RQ3
+
+Use this mode when you want a small real/VM SDN lab instead of Mininet. The
+recommended setup is one Ryu controller, one Open vSwitch/OpenFlow switch, and
+2-3 real machines or VMs:
+
+```
+Victim VM/laptop  ─┐
+Normal VM/laptop  ├── Open vSwitch / OpenFlow switch ─── Ryu controller
+Attacker VM       ─┘
+```
+
+### 1. Prepare Open vSwitch
+
+On the OVS switch machine:
+
+```bash
+sudo apt-get install -y openvswitch-switch
+sudo ovs-vsctl add-br br-sdn
+sudo ovs-vsctl set bridge br-sdn protocols=OpenFlow13
+sudo ovs-vsctl set-controller br-sdn tcp:<CONTROLLER_IP>:6653
+sudo ovs-vsctl add-port br-sdn <victim_if>
+sudo ovs-vsctl add-port br-sdn <normal_if>
+sudo ovs-vsctl add-port br-sdn <attacker_if>
+sudo ovs-vsctl show
+```
+
+If you use VMs on one host, attach VM tap/vnet interfaces to `br-sdn`. If you
+use a physical OpenFlow switch, configure its controller as
+`tcp:<CONTROLLER_IP>:6653` and note the datapath ID.
+
+### 2. Start Ryu and Dashboard
+
+On the controller machine:
+
+```bash
+ryu-manager env/ryu_controller.py --observe-links
+python3 main.py web --ryu-url http://<CONTROLLER_IP>:8080 --dpids 1 --sniff-iface any
+```
+
+Use the actual DPID if it is not `1`.
+
+### 3. Run Real-Testbed Inference
+
+Start with dry-run mode. It logs what the agent would do but does not install
+DROP/VLAN rules:
+
+```bash
+python3 main.py realtest \
+  --agent custom \
+  --checkpoint checkpoints/dqn_final.pt \
+  --ryu-url http://<CONTROLLER_IP>:8080 \
+  --dpids 1 \
+  --steps 120 \
+  --ground-truth unknown
+```
+
+After confirming target ports are correct, enable real mitigation:
+
+```bash
+python3 main.py realtest \
+  --agent custom \
+  --checkpoint checkpoints/dqn_final.pt \
+  --ryu-url http://<CONTROLLER_IP>:8080 \
+  --dpids 1 \
+  --steps 120 \
+  --ground-truth attack \
+  --apply-actions
+```
+
+Results are written to `runs/realtest_results.csv` with action, inferred attack
+type, target DPID/port, target reason, and whether mitigation was applied.
+
+### 4. RQ3 Measurement
+
+For RQ3, train/evaluate in Mininet first, then run the same checkpoint on this
+testbed under:
+
+- normal traffic only
+- ARP spoofing from the attacker VM
+- Rogue AP indicator traffic if available, or the simulated SSID/beacon feature
+  path described in the report
+- background traffic such as `iperf3`, DNS/HTTP requests, ping bursts, latency,
+  and packet loss
+
+Report the performance drop from Mininet to the real/VM testbed using F1, FPR,
+MTTD, MTTI, action distribution, and target correctness. If the lab uses VMs or
+OVS instead of physical switches, describe it as a **level-2 real/VM OpenFlow
+testbed**, not a production network.
 

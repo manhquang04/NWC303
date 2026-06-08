@@ -14,6 +14,20 @@ interface Props {
   state: DashboardState
 }
 
+function targetHostId(state: DashboardState, topology: TopologyData): string | null {
+  if (!state.target) return null
+  const mac = state.target.mac?.toLowerCase()
+  const macMatch = mac?.match(/00:00:00:00:00:([0-9a-f]{2})$/)
+  if (macMatch) {
+    const idx = parseInt(macMatch[1], 16)
+    if (topology.nodes.some(n => n.id === `h${idx}`)) return `h${idx}`
+  }
+
+  const hostsPerSwitch = Math.max(1, Math.floor(topology.config.num_hosts / topology.config.num_switches))
+  const hostIdx = (state.target.dpid - 1) * hostsPerSwitch + state.target.port
+  return topology.nodes.some(n => n.id === `h${hostIdx}`) ? `h${hostIdx}` : null
+}
+
 export default function TopologyGraph({ topology, state }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const networkRef = useRef<Network | null>(null)
@@ -90,26 +104,33 @@ export default function TopologyGraph({ topology, state }: Props) {
 
     const isAttack = state.ground_truth === 'attack'
     const action = state.current_action
+    const targetId = targetHostId(state, topology)
     const updates: any[] = []
 
     topology.nodes.forEach(n => {
       if (n.type !== 'host') return
 
       const isAttacker = n.role === 'rogue_ap' || n.role === 'arp_spoofer'
+      const isTarget = targetId === n.id
       let bg = '#38bdf8'
       let border = '#0ea5e9'
       let borderWidth = 2
       let label = n.label
       let shadow: any = { enabled: true, color: 'rgba(0,0,0,0.3)', size: 10 }
 
-      if (isAttacker && isAttack) {
+      if (isTarget && action > 0) {
+        bg = ACTION_COLORS[action]
+        border = '#fbbf24'
+        borderWidth = 5
+        label = `${n.label}\nTARGET ${ACTION_LABELS[action]}`
+        shadow = { enabled: true, color: ACTION_COLORS[action], size: 28 }
+      } else if (isAttacker && isAttack) {
         if (action > 0) {
-          // Agent acted on attacker
-          bg = ACTION_COLORS[action]
+          bg = '#7f1d1d'
           border = '#fbbf24'
-          borderWidth = 4
-          label = `${n.label}\n[${ACTION_LABELS[action]}]`
-          shadow = { enabled: true, color: ACTION_COLORS[action], size: 20 }
+          borderWidth = 3
+          label = `${n.label}\nSUSPECT`
+          shadow = { enabled: true, color: '#ef4444', size: 18 }
         } else {
           // Attack happening, no action yet
           bg = n.role === 'rogue_ap' ? '#dc2626' : '#ea580c'
@@ -147,7 +168,7 @@ export default function TopologyGraph({ topology, state }: Props) {
     })
 
     if (updates.length > 0) nodesRef.current.update(updates)
-  }, [state.current_action, state.ground_truth, topology.nodes])
+  }, [state.current_action, state.ground_truth, state.target, topology])
 
   const isAttack = state.ground_truth === 'attack'
 
@@ -169,7 +190,7 @@ export default function TopologyGraph({ topology, state }: Props) {
           letterSpacing: '1px',
         }}>
           {state.current_action > 0
-            ? `${ACTION_LABELS[state.current_action]} — ATTACK MITIGATED`
+            ? `${ACTION_LABELS[state.current_action]} TARGET ${state.target ? `s${state.target.dpid}:p${state.target.port}` : 'NOT FOUND'}`
             : 'ATTACK IN PROGRESS — MONITORING'}
         </div>
       )}

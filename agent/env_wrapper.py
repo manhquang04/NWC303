@@ -16,10 +16,11 @@ import numpy as np
 from gymnasium import spaces
 
 from agent.reward import compute_reward
-from config import CFG, NUM_ACTIONS
+from config import ACTION_BLOCK, ACTION_ISOLATE, CFG, NUM_ACTIONS
 from detection.feature_extractor import FeatureExtractor
 from detection.flow_collector import FlowCollector
 from detection.state_builder import StateBuilder
+from detection.target_selector import IsolationTarget, TargetSelector
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ class SDNIDSEnv(gym.Env):
 
         self.feature_extractor = FeatureExtractor()
         self.state_builder = StateBuilder()
+        self.target_selector = TargetSelector()
 
         dim = CFG.detection.state_dim
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(dim,), dtype=np.float32)
@@ -57,6 +59,8 @@ class SDNIDSEnv(gym.Env):
 
         self._step_count: int = 0
         self._last_obs: Optional[np.ndarray] = None
+        self._last_features: Dict[str, float] = {}
+        self._last_target: Optional[IsolationTarget] = None
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None
               ) -> Tuple[np.ndarray, Dict[str, Any]]:
@@ -80,10 +84,13 @@ class SDNIDSEnv(gym.Env):
         obs = self._get_obs()
 
         if self.mode == "training":
-            gt = "attack" if self.attack_log.is_attack_at(time.time()) else "normal"
+            now = time.time()
+            gt = "attack" if self.attack_log.is_attack_at(now) else "normal"
+            active_types = self.attack_log.active_types_at(now) if hasattr(self.attack_log, "active_types_at") else []
             reward = compute_reward(action, gt)
         else:
             gt = "unknown"
+            active_types = []
             reward = 0.0
 
         truncated = self._step_count >= self.max_steps
@@ -91,8 +98,12 @@ class SDNIDSEnv(gym.Env):
 
         info: Dict[str, Any] = {
             "ground_truth": gt,
+            "attack_type": ",".join(active_types) if active_types else "none",
             "action": action,
             "step": self._step_count,
+            "target": self._last_target.as_dict() if self._last_target else None,
+            "target_dpid": self._last_target.dpid if self._last_target else None,
+            "target_port": self._last_target.port if self._last_target else None,
         }
         self._last_obs = obs
         return obs, float(reward), terminated, truncated, info
@@ -104,11 +115,20 @@ class SDNIDSEnv(gym.Env):
     def _get_obs(self) -> np.ndarray:
         snap = self.flow_collector.get_latest() if self.flow_collector else None
         if snap is None:
+            self._last_features = {}
             return np.zeros(CFG.detection.state_dim, dtype=np.float32)
         feats = self.feature_extractor.extract(snap)
+        self._last_features = feats
         return self.state_builder.build(feats)
 
     def _apply_action(self, action: int) -> None:
+        self._last_target = None
+        if action in (ACTION_BLOCK, ACTION_ISOLATE):
+            snap = self.flow_collector.get_latest() if self.flow_collector else None
+            target = self.target_selector.select(snap, self._last_features)
+            self._last_target = target
+            if target is not None:
+                self.isolator.set_target(target.dpid, target.port)
         try:
             self.isolator.apply(action)
         except Exception:  # pragma: no cover

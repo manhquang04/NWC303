@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import logging
+import random
 import sys
 import threading
 from pathlib import Path
 
-from config import CFG
+from config import CHECKPOINT_DIR, CFG, LOG_DIR
 from evaluation.logger import MetricsLogger, setup_logging
 
 _TRAIN_STATE_FILE = Path("/tmp/sdnids_train_state.json")
@@ -17,7 +19,8 @@ _TRAIN_STATE_FILE = Path("/tmp/sdnids_train_state.json")
 
 def _write_train_state(action: int, ground_truth: str, reward: float,
                        episode: int, epsilon: float, step: int,
-                       cumulative_reward: float) -> None:
+                       cumulative_reward: float, attack_type: str = "none",
+                       target: dict | None = None) -> None:
     try:
         with open(_TRAIN_STATE_FILE, "w") as f:
             json.dump({
@@ -28,6 +31,8 @@ def _write_train_state(action: int, ground_truth: str, reward: float,
                 "epsilon": epsilon,
                 "step": step,
                 "cumulative_reward": cumulative_reward,
+                "attack_type": attack_type,
+                "target": target,
             }, f)
     except OSError:
         pass
@@ -42,10 +47,44 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--timesteps", type=int, default=500_000, help="(SB3 only)")
     p.add_argument("--attack-ratio", type=float, default=0.4)
     p.add_argument("--checkpoint", type=Path, default=None)
+    p.add_argument("--seed", type=int, default=CFG.dqn.seed)
+    p.add_argument("--max-steps", type=int, default=CFG.dqn.max_steps_per_episode)
     return p.parse_args()
 
 
-def build_env(attack_ratio: float = 0.4):
+class StepCSVLogger:
+    """Append per-step training metadata for experiment analysis."""
+
+    def __init__(self, path: Path = LOG_DIR / "train_steps.csv") -> None:
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        write_header = (not self.path.exists()) or self.path.stat().st_size == 0
+        self._file = open(self.path, "a", newline="", encoding="utf-8")
+        self._csv = csv.writer(self._file)
+        if write_header:
+            self._csv.writerow([
+                "episode", "step", "epsilon", "loss", "reward",
+                "cumulative_reward", "ground_truth", "attack_type",
+                "action", "target_dpid", "target_port", "target_reason",
+            ])
+            self._file.flush()
+
+    def log(self, episode: int, step: int, epsilon: float, loss: float, reward: float,
+            cumulative_reward: float, info: dict) -> None:
+        target = info.get("target") or {}
+        self._csv.writerow([
+            episode, step, f"{epsilon:.6f}", f"{loss:.6f}", f"{reward:.4f}",
+            f"{cumulative_reward:.4f}", info.get("ground_truth", "unknown"),
+            info.get("attack_type", "none"), info.get("action", ""),
+            target.get("dpid", ""), target.get("port", ""), target.get("reason", ""),
+        ])
+        self._file.flush()
+
+    def close(self) -> None:
+        self._file.close()
+
+
+def build_env(attack_ratio: float = 0.4, max_steps: int = CFG.dqn.max_steps_per_episode):
     """Initialize SDNIDSEnv with topology, attacks, isolator, and flow collector."""
     import random
     from agent.env_wrapper import SDNIDSEnv
@@ -112,6 +151,7 @@ def build_env(attack_ratio: float = 0.4):
         attack_event_log=attack_log,
         isolator=isolator,
         flow_collector=collector,
+        max_steps=max_steps,
     )
     return env, topology, collector, attacks, attack_thread_stop
 
@@ -119,9 +159,13 @@ def build_env(attack_ratio: float = 0.4):
 def train_custom(args: argparse.Namespace) -> None:
     from agent.dqn_agent import DQNAgent
 
-    env, topology, collector, attacks, sched_stop = build_env(args.attack_ratio)
+    random.seed(args.seed)
+    env, topology, collector, attacks, sched_stop = build_env(args.attack_ratio, args.max_steps)
     agent = DQNAgent()
+    if args.checkpoint is not None:
+        agent.load(args.checkpoint)
     metrics = MetricsLogger()
+    step_logger = StepCSVLogger()
 
     try:
         for ep in range(args.episodes):
@@ -135,7 +179,8 @@ def train_custom(args: argparse.Namespace) -> None:
                 next_obs, reward, terminated, truncated, info = env.step(action)
                 done = terminated or truncated
                 agent.remember(obs, action, reward, next_obs, done)
-                ep_loss += agent.learn()
+                loss = agent.learn()
+                ep_loss += loss
                 agent.decay_epsilon()
                 obs = next_obs
                 ep_reward += reward
@@ -148,18 +193,23 @@ def train_custom(args: argparse.Namespace) -> None:
                     epsilon=agent.epsilon,
                     step=steps,
                     cumulative_reward=ep_reward,
+                    attack_type=info.get("attack_type", "none"),
+                    target=info.get("target"),
                 )
+                step_logger.log(ep, steps, agent.epsilon, loss, reward, ep_reward, info)
 
             metrics.log_episode(ep, ep_reward, ep_loss / max(1, steps), agent.epsilon)
             log.info("EP %4d | reward=%+8.2f | eps=%.3f | steps=%d",
                      ep, ep_reward, agent.epsilon, steps)
 
             if (ep + 1) % CFG.dqn.checkpoint_every == 0:
-                ckpt = CFG.CHECKPOINT_DIR / f"dqn_ep{ep+1}.pt"
+                ckpt = CHECKPOINT_DIR / f"dqn_ep{ep+1}.pt"
                 agent.save(ckpt)
 
-        agent.save(CFG.CHECKPOINT_DIR / "dqn_final.pt")
+        agent.save(CHECKPOINT_DIR / "dqn_final.pt")
     finally:
+        step_logger.close()
+        metrics.close()
         sched_stop.set()
         for atk in attacks:
             atk.stop()
@@ -172,11 +222,16 @@ def train_custom(args: argparse.Namespace) -> None:
 def run_sb3_training(args: argparse.Namespace) -> None:
     from agent.sb3_agent import build_sb3_dqn, train_sb3 as sb3_train
 
-    env, topology, collector, attacks, sched_stop = build_env(args.attack_ratio)
+    random.seed(args.seed)
+    env, topology, collector, attacks, sched_stop = build_env(args.attack_ratio, args.max_steps)
     try:
-        model = build_sb3_dqn(env, tensorboard_log=str(CFG.logging_cfg.tensorboard_dir))
+        if args.checkpoint is not None:
+            from stable_baselines3 import DQN as SB3DQN
+            model = SB3DQN.load(str(args.checkpoint), env=env)
+        else:
+            model = build_sb3_dqn(env, tensorboard_log=str(CFG.logging_cfg.tensorboard_dir))
         sb3_train(model, total_timesteps=args.timesteps,
-                  save_path=CFG.CHECKPOINT_DIR / "sb3_dqn.zip")
+                  save_path=CHECKPOINT_DIR / "sb3_dqn.zip")
     finally:
         sched_stop.set()
         for atk in attacks:
