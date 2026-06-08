@@ -190,6 +190,20 @@ sudo .venv311/bin/python main.py train --algo custom --episodes 300 --max-steps 
 sudo .venv311/bin/python main.py experiment --episodes 10 --max-steps 100
 ```
 
+The root-level research scripts provide the same workflow with reward ablation:
+
+```bash
+# Full run. This can take a long time because Mininet steps sleep for polling.
+sudo PYTHON_BIN=.venv311/bin/python bash run_full_experiment.sh
+
+# Quick smoke run to verify the workflow before a long run.
+sudo EPISODES=1 MAX_STEPS=3 EVAL_EPISODES=1 PYTHON_BIN=.venv311/bin/python bash run_full_experiment.sh
+```
+
+Reward ablation configs live in `config/reward_v1.yaml`,
+`config/reward_v2_fn_penalty.yaml`, and `config/reward_v3_isolate_boost.yaml`.
+The default reward in `config.py` uses the stronger FN penalty version.
+
 Generated outputs:
 
 | File | Use |

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import os
+from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Tuple
+from typing import Any, Tuple
 
 
 PROJECT_ROOT: Path = Path(__file__).parent.resolve()
@@ -94,13 +95,15 @@ NUM_ACTIONS: int = 4
 
 @dataclass(frozen=True)
 class RewardConfig:
-    r_attack_blocked: float = +10.0
+    r_attack_blocked: float = +30.0
     r_attack_flagged: float = +2.0
-    r_attack_ignored: float = -8.0
+    r_attack_ignored: float = -50.0
     r_normal_allowed: float = +1.0
     r_normal_flagged: float = -0.5
-    r_normal_blocked: float = -5.0
+    r_normal_blocked: float = -15.0
     r_time_step: float = -0.1
+    r_isolate_correct: float = +40.0
+    r_isolate_wrong: float = -30.0
 
 
 @dataclass(frozen=True)
@@ -147,4 +150,53 @@ class GlobalConfig:
     logging_cfg: LoggingConfig = field(default_factory=LoggingConfig)
 
 
-CFG: GlobalConfig = GlobalConfig()
+_REWARD_KEY_MAP = {
+    "reward_tp_attack": "r_attack_blocked",
+    "reward_fn_attack": "r_attack_ignored",
+    "reward_fp_normal": "r_normal_blocked",
+    "reward_isolate_correct": "r_isolate_correct",
+    "reward_isolate_wrong": "r_isolate_wrong",
+    "r_attack_blocked": "r_attack_blocked",
+    "r_attack_flagged": "r_attack_flagged",
+    "r_attack_ignored": "r_attack_ignored",
+    "r_normal_allowed": "r_normal_allowed",
+    "r_normal_flagged": "r_normal_flagged",
+    "r_normal_blocked": "r_normal_blocked",
+    "r_time_step": "r_time_step",
+    "r_isolate_correct": "r_isolate_correct",
+    "r_isolate_wrong": "r_isolate_wrong",
+}
+
+
+def _load_yaml_reward_config(path: Path) -> RewardConfig:
+    """Load a RewardConfig override from a YAML file."""
+    try:
+        import yaml
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError("PyYAML is required for SDNIDS_REWARD_CONFIG.") from exc
+
+    if not path.exists():
+        raise FileNotFoundError(path)
+
+    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"Reward config must be a YAML mapping: {path}")
+
+    values: dict[str, Any] = {}
+    for key, value in raw.items():
+        mapped = _REWARD_KEY_MAP.get(str(key))
+        if mapped is not None:
+            values[mapped] = float(value)
+    return replace(RewardConfig(), **values)
+
+
+def _build_global_config() -> GlobalConfig:
+    """Build global config and optionally apply SDNIDS_REWARD_CONFIG."""
+    cfg = GlobalConfig()
+    reward_path = os.getenv("SDNIDS_REWARD_CONFIG")
+    if reward_path:
+        cfg = replace(cfg, reward=_load_yaml_reward_config(Path(reward_path)))
+    return cfg
+
+
+CFG: GlobalConfig = _build_global_config()

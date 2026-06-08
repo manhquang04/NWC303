@@ -19,6 +19,7 @@ scapy
 # Data / Numerical
 numpy
 pandas
+pyyaml
 
 # Visualization / Logging
 matplotlib

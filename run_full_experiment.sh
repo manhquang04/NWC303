@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+EPISODES="${EPISODES:-100}"
+MAX_STEPS="${MAX_STEPS:-100}"
+EVAL_EPISODES="${EVAL_EPISODES:-10}"
+if [[ -z "${PYTHON_BIN:-}" ]]; then
+  if [[ -x ".venv311/bin/python" ]]; then
+    PYTHON_BIN=".venv311/bin/python"
+  else
+    PYTHON_BIN="python3"
+  fi
+fi
+
+mkdir -p runs runs/checkpoints
+
+echo "=== STEP 1: Train custom DQN ${EPISODES} episodes ==="
+"${PYTHON_BIN}" train.py --episodes "${EPISODES}" --model custom_dqn --lr 0.001 --batch-size 64 --max-steps "${MAX_STEPS}" --save-path runs/checkpoints
+
+echo "=== STEP 2: Evaluate custom DQN ==="
+"${PYTHON_BIN}" evaluate.py --model runs/checkpoints/dqn_final.pt --scenario all --episodes "${EVAL_EPISODES}" --max-steps "${MAX_STEPS}" --output runs/evaluation_results.csv
+
+echo "=== STEP 3: Ablation Reward v1 (baseline) ==="
+"${PYTHON_BIN}" experiment.py --reward config/reward_v1.yaml --episodes "${EPISODES}" --max-steps "${MAX_STEPS}" --eval-episodes "${EVAL_EPISODES}" --output runs/exp_v1.csv
+
+echo "=== STEP 4: Ablation Reward v2 (FN penalty) ==="
+"${PYTHON_BIN}" experiment.py --reward config/reward_v2_fn_penalty.yaml --episodes "${EPISODES}" --max-steps "${MAX_STEPS}" --eval-episodes "${EVAL_EPISODES}" --output runs/exp_v2.csv
+
+echo "=== STEP 5: Ablation Reward v3 (isolate boost) ==="
+"${PYTHON_BIN}" experiment.py --reward config/reward_v3_isolate_boost.yaml --episodes "${EPISODES}" --max-steps "${MAX_STEPS}" --eval-episodes "${EVAL_EPISODES}" --output runs/exp_v3.csv
+
+echo "=== STEP 6: Aggregate results ==="
+"${PYTHON_BIN}" aggregate_results.py --input runs/exp_v1.csv runs/exp_v2.csv runs/exp_v3.csv --output runs/final_research_results.csv
+
+echo "=== DONE ==="
+echo "Results saved to runs/final_research_results.csv"
+echo "Evaluation saved to runs/evaluation_results.csv"
+echo "Reward curve saved to runs/checkpoints/reward_curve.png"

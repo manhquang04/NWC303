@@ -17,6 +17,13 @@ log = logging.getLogger(__name__)
 
 GroundTruth = Literal["attack", "normal"]
 
+REWARD_TP_NORMAL = 10
+REWARD_TP_ATTACK = 30
+REWARD_FN_ATTACK = -50
+REWARD_FP_NORMAL = -15
+REWARD_ISOLATE_CORRECT = 40
+REWARD_ISOLATE_WRONG = -30
+
 
 def compute_reward(
     action: int,
@@ -28,7 +35,9 @@ def compute_reward(
     base = r.r_time_step
 
     if ground_truth == "attack":
-        if action in (ACTION_BLOCK, ACTION_ISOLATE):
+        if action == ACTION_ISOLATE:
+            return base + r.r_isolate_correct
+        if action == ACTION_BLOCK:
             return base + r.r_attack_blocked
         if action == ACTION_FLAG:
             return base + r.r_attack_flagged
@@ -40,7 +49,9 @@ def compute_reward(
             return base + r.r_normal_allowed
         if action == ACTION_FLAG:
             return base + r.r_normal_flagged
-        if action in (ACTION_BLOCK, ACTION_ISOLATE):
+        if action == ACTION_ISOLATE:
+            return base + r.r_isolate_wrong
+        if action == ACTION_BLOCK:
             return base + false_positive_penalty
 
     log.warning("Unknown (action=%s, gt=%s) — returning time penalty only.", action, ground_truth)
