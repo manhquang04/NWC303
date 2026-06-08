@@ -172,9 +172,10 @@ def _build_eval_env(max_steps: int):
     spoofer_mac = spoofer_host.MAC() if spoofer_host else "de:ad:be:ef:00:06"
 
     attacks = {
-        "rogue": RogueAPAttack(iface=rogue_iface, on_event=attack_log.append),
+        "rogue": RogueAPAttack(iface=rogue_iface, on_event=attack_log.append,
+                               host=rogue_host),
         "arp": ARPSpoofAttack(iface=spoofer_iface, attacker_mac=spoofer_mac,
-                              on_event=attack_log.append),
+                              on_event=attack_log.append, host=spoofer_host),
     }
 
     env = SDNIDSEnv(
