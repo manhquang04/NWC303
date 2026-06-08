@@ -2,6 +2,10 @@
 
 Real-time intrusion detection system for SDN networks using Deep Reinforcement Learning (DQN) to detect and isolate **Rogue Access Points** and **ARP Spoofing** attacks.
 
+This is a prototype SDN lab system using Mininet, Open vSwitch, and Ryu. Rogue
+AP behavior is represented through packet/flow indicators such as SSID beacon
+count and unknown SSID count, not through a physical Wi-Fi access point.
+
 ## Architecture
 
 ```
@@ -88,11 +92,12 @@ sudo apt-get install -y mininet openvswitch-switch python3.11 python3.11-venv py
 sudo systemctl start openvswitch-switch
 
 # Python environment (must use python3.11)
-python3.11 -m venv .venv
-source .venv/bin/activate
+python3.11 -m venv .venv311
+source .venv311/bin/activate
 
 # Install all Python dependencies first (includes ryu's deps)
 pip install -r requirements.txt
+pip install cryptography
 
 # Install Ryu (requires patch for setuptools compatibility)
 cd /tmp
@@ -103,38 +108,105 @@ sed -i 's/_main_module()._orig_get_script_args = easy_install.get_script_args/pa
 pip install . --no-build-isolation --no-deps
 cd ~/NWC303
 
+# Let the venv import Ubuntu's Mininet package without overriding venv packages
+python - <<'PY'
+import site
+from pathlib import Path
+site_dir = Path(site.getsitepackages()[0])
+(site_dir / "ubuntu-dist-packages.pth").write_text("/usr/lib/python3/dist-packages\n")
+PY
+
+# Patch Ryu for newer eventlet packages if ryu-manager fails on ALREADY_HANDLED
+python - <<'PY'
+from pathlib import Path
+p = Path(".venv311/lib/python3.11/site-packages/ryu/app/wsgi.py")
+s = p.read_text()
+old = "    from eventlet.wsgi import ALREADY_HANDLED\n"
+new = (
+    "    try:\n"
+    "        from eventlet.wsgi import ALREADY_HANDLED\n"
+    "    except ImportError:\n"
+    "        ALREADY_HANDLED = object()\n"
+)
+if old in s:
+    p.write_text(s.replace(old, new))
+PY
+
 # Web frontend
 cd web/frontend && npm install && npm run build && cd ../..
 ```
+
+On Ubuntu 26.04/UTM, prefer `.venv311` over an existing `.venv` if `.venv`
+was created with Python 3.9 or another Python version.
 
 ### 2. Run
 
 ```bash
 # Terminal 1: Ryu controller
-ryu-manager env/ryu_controller.py --observe-links
+source .venv311/bin/activate
+PYTHONPATH=. ryu-manager env/ryu_controller.py --observe-links
 
 # Terminal 2: Train DRL agent (requires sudo, use venv python)
-sudo .venv/bin/python3 main.py train --algo custom --episodes 1000
+sudo .venv311/bin/python main.py train --algo custom --episodes 100 --max-steps 100
 
 # Terminal 3: Web dashboard
-python3 main.py web --port 8000
+source .venv311/bin/activate
+python main.py web --port 8000
 # Open http://localhost:8000
 
 # Monitor with TensorBoard
 tensorboard --logdir runs/
 
 # Evaluate trained model
-sudo python3 main.py evaluate --checkpoint checkpoints/dqn_final.pt --algo custom
+sudo .venv311/bin/python main.py evaluate --checkpoint checkpoints/dqn_final.pt --algo custom
 
 # Generate plots
-python3 main.py plot
+python main.py plot
 ```
 
 ### 3. Test
 
 ```bash
-pytest tests/ -v
+source .venv311/bin/activate
+pytest tests/ -q
 ```
+
+If Mininet prints `sch_htb quantum of class ... is big`, it is a noisy Linux
+traffic-control warning and is not fatal.
+
+### 4. Run Experiments for the Research Questions
+
+Run a short smoke experiment first:
+
+```bash
+sudo .venv311/bin/python main.py train --algo custom --episodes 8 --max-steps 30
+sudo .venv311/bin/python main.py experiment --episodes 2 --max-steps 20
+```
+
+For report-quality data, increase the budget:
+
+```bash
+sudo .venv311/bin/python main.py train --algo custom --episodes 300 --max-steps 100 --seed 42
+sudo .venv311/bin/python main.py experiment --episodes 10 --max-steps 100
+```
+
+Generated outputs:
+
+| File | Use |
+|---|---|
+| `checkpoints/dqn_final.pt` | Final custom DQN checkpoint |
+| `runs/metrics.csv` | Per-episode training reward, loss, epsilon |
+| `runs/train_steps.csv` | Per-step action, attack type, reward, target DPID/port |
+| `runs/experiment_results.csv` | Baseline vs DRL metrics by scenario |
+| `runs/confusion_matrix.png` | Confusion matrix plot if `main.py plot` is run |
+
+Use these files to answer the research questions:
+
+| RQ | Evidence to inspect |
+|---|---|
+| RQ1: Can DRL distinguish normal vs Rogue AP/ARP spoofing? | `runs/experiment_results.csv`: compare recall, precision, F1, TP/FP/TN/FN for `normal`, `arp`, `rogue`, and `mixed` |
+| RQ2: Which reward function is effective? | `runs/metrics.csv` and `runs/train_steps.csv`: reward trend, action distribution, missed attack penalties, block/isolate rewards |
+| RQ3: Is performance robust outside simulation? | `runs/realtest_results.csv` from `main.py realtest`, compared with Mininet results in `runs/experiment_results.csv` |
 
 ## Action Space
 
@@ -262,4 +334,3 @@ Report the performance drop from Mininet to the real/VM testbed using F1, FPR,
 MTTD, MTTI, action distribution, and target correctness. If the lab uses VMs or
 OVS instead of physical switches, describe it as a **level-2 real/VM OpenFlow
 testbed**, not a production network.
-

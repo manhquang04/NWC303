@@ -10,6 +10,7 @@ build/
 
 # Virtual env
 .venv/
+.venv311/
 venv/
 
 
