@@ -45,7 +45,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--algo", choices=["custom", "sb3"], default="custom")
     p.add_argument("--episodes", type=int, default=CFG.dqn.max_episodes)
     p.add_argument("--timesteps", type=int, default=500_000, help="(SB3 only)")
-    p.add_argument("--attack-ratio", type=float, default=0.4)
+    p.add_argument("--attack-ratio", type=float, default=CFG.attack.attack_ratio)
     p.add_argument("--checkpoint", type=Path, default=None)
     p.add_argument("--seed", type=int, default=CFG.dqn.seed)
     p.add_argument("--max-steps", type=int, default=CFG.dqn.max_steps_per_episode)
@@ -65,7 +65,9 @@ class StepCSVLogger:
             self._csv.writerow([
                 "episode", "step", "epsilon", "loss", "reward",
                 "cumulative_reward", "ground_truth", "attack_type",
-                "action", "target_dpid", "target_port", "target_reason",
+                "action", "raw_action", "action_gated", "gated_action_count",
+                "detection_confidence", "no_target_penalty",
+                "normal_only_episode", "target_dpid", "target_port", "target_reason",
             ])
             self._file.flush()
 
@@ -76,6 +78,10 @@ class StepCSVLogger:
             episode, step, f"{epsilon:.6f}", f"{loss:.6f}", f"{reward:.4f}",
             f"{cumulative_reward:.4f}", info.get("ground_truth", "unknown"),
             info.get("attack_type", "none"), info.get("action", ""),
+            info.get("raw_action", ""), int(bool(info.get("action_gated", False))),
+            info.get("gated_action_count", ""), f"{float(info.get('detection_confidence', 0.0)):.4f}",
+            int(bool(info.get("no_target_penalty", False))),
+            int(bool(info.get("normal_only_episode", False))),
             target.get("dpid", ""), target.get("port", ""), target.get("reason", ""),
         ])
         self._file.flush()
@@ -84,7 +90,8 @@ class StepCSVLogger:
         self._file.close()
 
 
-def build_env(attack_ratio: float = 0.4, max_steps: int = CFG.dqn.max_steps_per_episode):
+def build_env(attack_ratio: float = CFG.attack.attack_ratio,
+              max_steps: int = CFG.dqn.max_steps_per_episode):
     """Initialize SDNIDSEnv with topology, attacks, isolator, and flow collector."""
     import random
     from agent.env_wrapper import SDNIDSEnv
@@ -98,7 +105,7 @@ def build_env(attack_ratio: float = 0.4, max_steps: int = CFG.dqn.max_steps_per_
     topology = SDNTopology()
     topology.start()
 
-    attack_log = AttackEventLog()
+    attack_log = AttackEventLog(attack_ratio=attack_ratio)
     isolator = Isolator()
     collector = FlowCollector(dpids=[1, 2, 3])
     collector.start()
@@ -131,7 +138,7 @@ def build_env(attack_ratio: float = 0.4, max_steps: int = CFG.dqn.max_steps_per_
     def attack_scheduler():
         while not attack_thread_stop.is_set():
             # Attack active period
-            if random.random() < attack_ratio:
+            if attack_log.attacks_enabled() and random.random() < attack_ratio:
                 atk = random.choice(attacks)
                 if not atk.is_running():
                     atk.start(CFG.attack.rogue_beacon_rate_pps
@@ -154,6 +161,8 @@ def build_env(attack_ratio: float = 0.4, max_steps: int = CFG.dqn.max_steps_per_
         isolator=isolator,
         flow_collector=collector,
         max_steps=max_steps,
+        attack_ratio=attack_ratio,
+        attacks=attacks,
     )
     return env, topology, collector, attacks, attack_thread_stop
 

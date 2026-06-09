@@ -47,6 +47,9 @@ class AttackConfig:
     arp_spoof_target_ip: str = "10.0.0.1"
     attack_duration_sec_min: int = 5
     attack_duration_sec_max: int = 30
+    attack_ratio: float = 0.3
+    fp_step_penalty: float = 10.0
+    confidence_threshold: float = 0.6
 
 
 @dataclass(frozen=True)

@@ -247,9 +247,12 @@ while True:
 
 class AttackEventLog:
 
-    def __init__(self) -> None:
+    def __init__(self, attack_ratio: float = CFG.attack.attack_ratio) -> None:
+        """Store attack lifecycle events and per-episode attack sampling state."""
         self._events: List[AttackEvent] = []
         self._lock = threading.Lock()
+        self.attack_ratio = float(attack_ratio)
+        self._attacks_enabled = True
 
     def append(self, evt: AttackEvent) -> None:
         with self._lock:
@@ -258,6 +261,16 @@ class AttackEventLog:
     def all(self) -> List[AttackEvent]:
         with self._lock:
             return list(self._events)
+
+    def set_attacks_enabled(self, enabled: bool) -> None:
+        """Enable or disable attack generation for the current episode."""
+        with self._lock:
+            self._attacks_enabled = bool(enabled)
+
+    def attacks_enabled(self) -> bool:
+        """Return whether the current episode allows attack traffic."""
+        with self._lock:
+            return self._attacks_enabled
 
     def is_attack_at(self, ts: float, tolerance: float = 0.5) -> bool:
         return bool(self.active_types_at(ts=ts, tolerance=tolerance))

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import logging
 import time
 from dataclasses import dataclass, field
@@ -40,8 +41,10 @@ class MetricsReport:
     mtti_sec: float = 0.0
     cumulative_reward: float = 0.0
     episodes: int = 0
+    normal_action_dist: Dict[str, int] = field(default_factory=dict)
+    attack_action_dist: Dict[str, int] = field(default_factory=dict)
 
-    def as_dict(self) -> Dict[str, float]:
+    def as_dict(self) -> Dict[str, object]:
         return {
             "tp": self.tp, "fp": self.fp, "tn": self.tn, "fn": self.fn,
             "detection_rate": self.detection_rate,
@@ -50,6 +53,8 @@ class MetricsReport:
             "mttd_sec": self.mttd_sec, "mtti_sec": self.mtti_sec,
             "cumulative_reward": self.cumulative_reward,
             "episodes": self.episodes,
+            "normal_action_dist": dict(self.normal_action_dist),
+            "attack_action_dist": dict(self.attack_action_dist),
         }
 
 
@@ -101,7 +106,18 @@ class MetricsCalculator:
 
         rep.mttd_sec = self._mean_delay(self.attack_starts, self.detect_times)
         rep.mtti_sec = self._mean_delay(self.attack_starts, self.isolate_times)
+        rep.normal_action_dist = self._action_dist("normal")
+        rep.attack_action_dist = self._action_dist("attack")
         return rep
+
+    def _action_dist(self, ground_truth: str) -> Dict[str, int]:
+        """Count actions for one ground-truth class."""
+        from config import ACTION_NAMES
+        counts = {name: 0 for name in ACTION_NAMES}
+        for rec in self.records:
+            if rec.ground_truth == ground_truth:
+                counts[ACTION_NAMES[int(rec.action)]] += 1
+        return counts
 
     @staticmethod
     def _mean_delay(starts: List[float], events: List[float]) -> float:
@@ -147,7 +163,11 @@ def _write_report_row(path: Path, scenario: str, agent: str, report: MetricsRepo
         writer = csv.writer(f)
         if write_header:
             writer.writerow(["scenario", "agent", *report.as_dict().keys()])
-        writer.writerow([scenario, agent, *report.as_dict().values()])
+        values = [
+            json.dumps(v, sort_keys=True) if isinstance(v, dict) else v
+            for v in report.as_dict().values()
+        ]
+        writer.writerow([scenario, agent, *values])
 
 
 def _build_eval_env(max_steps: int):
@@ -237,8 +257,9 @@ def _evaluate_policy(policy, agent_name: str, scenario: str, episodes: int,
         obs, _ = env.reset()
         done = False
         while not done:
-            action = _choose_action(policy, agent_name, obs, env)
-            next_obs, reward, terminated, truncated, info = env.step(action)
+            raw_action = _choose_action(policy, agent_name, obs, env)
+            next_obs, reward, terminated, truncated, info = env.step(raw_action)
+            action = int(info.get("action", raw_action))
             done = terminated or truncated
             ts = time.time()
             gt = info.get("ground_truth", "normal")
