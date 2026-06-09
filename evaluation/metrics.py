@@ -22,6 +22,7 @@ class StepRecord:
     ground_truth: str         # "attack" | "normal"
     action: int
     reward: float
+    proposed_action: int = ACTION_ALLOW
     detected: bool = False
     isolated: bool = False
 
@@ -43,6 +44,7 @@ class MetricsReport:
     episodes: int = 0
     normal_action_dist: Dict[str, int] = field(default_factory=dict)
     attack_action_dist: Dict[str, int] = field(default_factory=dict)
+    action_confusion: Dict[str, Dict[str, int]] = field(default_factory=dict)
 
     def as_dict(self) -> Dict[str, object]:
         return {
@@ -55,6 +57,7 @@ class MetricsReport:
             "episodes": self.episodes,
             "normal_action_dist": dict(self.normal_action_dist),
             "attack_action_dist": dict(self.attack_action_dist),
+            "action_confusion": dict(self.action_confusion),
         }
 
 
@@ -108,6 +111,7 @@ class MetricsCalculator:
         rep.mtti_sec = self._mean_delay(self.attack_starts, self.isolate_times)
         rep.normal_action_dist = self._action_dist("normal")
         rep.attack_action_dist = self._action_dist("attack")
+        rep.action_confusion = self._action_confusion()
         return rep
 
     def _action_dist(self, ground_truth: str) -> Dict[str, int]:
@@ -118,6 +122,24 @@ class MetricsCalculator:
             if rec.ground_truth == ground_truth:
                 counts[ACTION_NAMES[int(rec.action)]] += 1
         return counts
+
+    def _action_confusion(self) -> Dict[str, Dict[str, int]]:
+        """Build TP/FP/TN/FN buckets for the executed action at each step."""
+        from config import ACTION_NAMES
+        matrix = {name: {"tp": 0, "fp": 0, "tn": 0, "fn": 0} for name in ACTION_NAMES}
+        for rec in self.records:
+            name = ACTION_NAMES[int(rec.action)]
+            is_attack = rec.ground_truth == "attack"
+            took_action = rec.action != ACTION_ALLOW
+            if is_attack and took_action:
+                matrix[name]["tp"] += 1
+            elif is_attack and not took_action:
+                matrix[name]["fn"] += 1
+            elif (not is_attack) and took_action:
+                matrix[name]["fp"] += 1
+            else:
+                matrix[name]["tn"] += 1
+        return matrix
 
     @staticmethod
     def _mean_delay(starts: List[float], events: List[float]) -> float:
@@ -253,13 +275,17 @@ def _evaluate_policy(policy, agent_name: str, scenario: str, episodes: int,
     was_attack = False
 
     for ep in range(episodes):
-        _start_scenario(scenario, attacks)
-        obs, _ = env.reset()
+        _stop_scenario(attacks)
+        obs, _ = env.reset(options={"normal_only_episode": scenario == "normal"})
+        if scenario != "normal":
+            _start_scenario(scenario, attacks)
+            time.sleep(CFG.detection.poll_interval_ms / 1000.0)
+            obs = env._get_obs()
         done = False
         while not done:
             raw_action = _choose_action(policy, agent_name, obs, env)
             next_obs, reward, terminated, truncated, info = env.step(raw_action)
-            action = int(info.get("action", raw_action))
+            action = int(info.get("executed_action", info.get("action", raw_action)))
             done = terminated or truncated
             ts = time.time()
             gt = info.get("ground_truth", "normal")
@@ -276,6 +302,7 @@ def _evaluate_policy(policy, agent_name: str, scenario: str, episodes: int,
                 ground_truth=gt,
                 action=action,
                 reward=reward,
+                proposed_action=raw_action,
                 detected=action != ACTION_ALLOW,
                 isolated=action in (ACTION_BLOCK, ACTION_ISOLATE),
             ))

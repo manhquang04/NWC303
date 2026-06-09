@@ -38,3 +38,5 @@ def test_metrics_counts_and_timing():
     assert report.mtti_sec == 3.5
     assert report.normal_action_dist["allow"] == 1
     assert report.attack_action_dist["block"] == 1
+    assert report.action_confusion["block"]["tp"] == 1
+    assert report.action_confusion["allow"]["tn"] == 1

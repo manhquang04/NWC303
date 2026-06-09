@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -17,6 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-steps", type=int, default=100)
     parser.add_argument("--output", type=Path, default=Path("runs/evaluation_results.csv"))
     parser.add_argument("--agent", choices=["custom", "baseline", "sb3", "all"], default="custom")
+    parser.add_argument("--reward-config", type=Path, default=None)
     return parser.parse_args()
 
 
@@ -34,18 +37,20 @@ def _resolve_checkpoint(model_path: Path) -> Path:
 
 
 def evaluate(model_path: Path, scenario: str, episodes: int, max_steps: int,
-             output: Path, agent: str) -> Path:
+             output: Path, agent: str, reward_config: Path | None = None) -> Path:
     """Evaluate a trained policy and export TP/FP/TN/FN, recall, and F1 to CSV."""
     if episodes <= 0:
         raise ValueError("--episodes must be positive")
+    if reward_config is not None and not reward_config.exists():
+        raise FileNotFoundError(reward_config)
     checkpoint = _resolve_checkpoint(model_path)
-
-    from evaluation.metrics import main as eval_main
 
     if output.exists():
         output.unlink()
-    sys.argv = [
-        "evaluate",
+    cmd = [
+        sys.executable,
+        "-m",
+        "evaluation.metrics",
         "--checkpoint", str(checkpoint),
         "--scenario", scenario,
         "--agent", agent,
@@ -53,10 +58,11 @@ def evaluate(model_path: Path, scenario: str, episodes: int, max_steps: int,
         "--max-steps", str(max_steps),
         "--out-csv", str(output),
     ]
+    env = os.environ.copy()
+    if reward_config is not None:
+        env["SDNIDS_REWARD_CONFIG"] = str(reward_config.resolve())
     print(f"[evaluate.py] scenario={scenario} agent={agent} episodes={episodes} max_steps={max_steps}")
-    rc = eval_main()
-    if rc != 0:
-        raise RuntimeError(f"Evaluation failed with exit code {rc}")
+    subprocess.run(cmd, check=True, env=env)
     print(f"[evaluate.py] Results saved to {output}")
     return output
 
@@ -64,7 +70,15 @@ def evaluate(model_path: Path, scenario: str, episodes: int, max_steps: int,
 def main() -> int:
     """Script entry point."""
     args = parse_args()
-    evaluate(args.model, args.scenario, args.episodes, args.max_steps, args.output, args.agent)
+    evaluate(
+        args.model,
+        args.scenario,
+        args.episodes,
+        args.max_steps,
+        args.output,
+        args.agent,
+        reward_config=args.reward_config,
+    )
     return 0
 
 

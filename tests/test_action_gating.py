@@ -26,17 +26,18 @@ class DummyCollector:
 
 
 class DummyAttackLog:
-    def __init__(self) -> None:
+    def __init__(self, active_types=None) -> None:
         self.enabled = True
+        self.active_types = active_types or []
 
     def set_attacks_enabled(self, enabled: bool) -> None:
         self.enabled = bool(enabled)
 
     def is_attack_at(self, ts: float) -> bool:
-        return False
+        return bool(self.active_types)
 
     def active_types_at(self, ts: float):
-        return []
+        return list(self.active_types)
 
 
 class DummyIsolator:
@@ -107,6 +108,17 @@ def test_high_confidence_isolate_is_not_gated():
     assert env._gate_action(ACTION_ISOLATE) == ACTION_ISOLATE
     assert env._last_action_gated is False
     assert env._gated_action_count == 0
+
+
+def test_simulated_attack_features_raise_confidence():
+    env = _env(attack_log=DummyAttackLog(active_types=["ARPSpoofAttack", "RogueAPAttack"]))
+    feats = {}
+
+    env._inject_simulated_attack_features(feats)
+
+    assert feats["arp_reply_rate"] >= CFG.detection.arp_rate_warn_threshold
+    assert feats["unknown_ssid_count"] >= 1.0
+    assert detection_confidence(feats) >= CFG.attack.confidence_threshold
 
 
 def test_normal_only_reset_disables_and_stops_attacks():

@@ -20,11 +20,15 @@ _TRAIN_STATE_FILE = Path("/tmp/sdnids_train_state.json")
 def _write_train_state(action: int, ground_truth: str, reward: float,
                        episode: int, epsilon: float, step: int,
                        cumulative_reward: float, attack_type: str = "none",
-                       target: dict | None = None) -> None:
+                       target: dict | None = None,
+                       proposed_action: int | None = None,
+                       executed_action: int | None = None) -> None:
     try:
         with open(_TRAIN_STATE_FILE, "w") as f:
             json.dump({
                 "action": action,
+                "proposed_action": proposed_action if proposed_action is not None else action,
+                "executed_action": executed_action if executed_action is not None else action,
                 "ground_truth": ground_truth,
                 "reward": reward,
                 "episode": episode,
@@ -65,7 +69,8 @@ class StepCSVLogger:
             self._csv.writerow([
                 "episode", "step", "epsilon", "loss", "reward",
                 "cumulative_reward", "ground_truth", "attack_type",
-                "action", "raw_action", "action_gated", "gated_action_count",
+                "action", "raw_action", "proposed_action", "executed_action",
+                "action_gated", "gated_action_count",
                 "detection_confidence", "no_target_penalty",
                 "normal_only_episode", "target_dpid", "target_port", "target_reason",
             ])
@@ -78,12 +83,47 @@ class StepCSVLogger:
             episode, step, f"{epsilon:.6f}", f"{loss:.6f}", f"{reward:.4f}",
             f"{cumulative_reward:.4f}", info.get("ground_truth", "unknown"),
             info.get("attack_type", "none"), info.get("action", ""),
-            info.get("raw_action", ""), int(bool(info.get("action_gated", False))),
+            info.get("raw_action", ""), info.get("proposed_action", info.get("raw_action", "")),
+            info.get("executed_action", info.get("action", "")),
+            int(bool(info.get("action_gated", False))),
             info.get("gated_action_count", ""), f"{float(info.get('detection_confidence', 0.0)):.4f}",
             int(bool(info.get("no_target_penalty", False))),
             int(bool(info.get("normal_only_episode", False))),
             target.get("dpid", ""), target.get("port", ""), target.get("reason", ""),
         ])
+        self._file.flush()
+
+    def close(self) -> None:
+        self._file.close()
+
+
+class StepDebugLogger:
+    """Write a fresh per-step debug trace for action/reward consistency audits."""
+
+    def __init__(self, path: Path = LOG_DIR / "step_debug.csv") -> None:
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._file = open(self.path, "w", newline="", encoding="utf-8")
+        self._csv = csv.DictWriter(self._file, fieldnames=[
+            "episode", "step", "scenario", "ground_truth", "proposed_action",
+            "executed_action", "gated", "reward", "target", "done",
+        ])
+        self._csv.writeheader()
+        self._file.flush()
+
+    def log(self, episode: int, step: int, reward: float, done: bool, info: dict) -> None:
+        self._csv.writerow({
+            "episode": episode,
+            "step": step,
+            "scenario": info.get("scenario", info.get("attack_type", "none")),
+            "ground_truth": info.get("ground_truth", "unknown"),
+            "proposed_action": info.get("proposed_action", info.get("raw_action", "")),
+            "executed_action": info.get("executed_action", info.get("action", "")),
+            "gated": int(bool(info.get("action_gated", False))),
+            "reward": f"{reward:.4f}",
+            "target": json.dumps(info.get("target"), sort_keys=True),
+            "done": int(bool(done)),
+        })
         self._file.flush()
 
     def close(self) -> None:
@@ -177,6 +217,7 @@ def train_custom(args: argparse.Namespace) -> None:
         agent.load(args.checkpoint)
     metrics = MetricsLogger()
     step_logger = StepCSVLogger()
+    debug_logger = StepDebugLogger()
 
     try:
         for ep in range(args.episodes):
@@ -189,7 +230,8 @@ def train_custom(args: argparse.Namespace) -> None:
                 action = agent.act(obs)
                 next_obs, reward, terminated, truncated, info = env.step(action)
                 done = terminated or truncated
-                agent.remember(obs, action, reward, next_obs, done)
+                executed_action = int(info.get("executed_action", info.get("action", action)))
+                agent.remember(obs, executed_action, reward, next_obs, done)
                 loss = agent.learn()
                 ep_loss += loss
                 agent.decay_epsilon()
@@ -197,7 +239,7 @@ def train_custom(args: argparse.Namespace) -> None:
                 ep_reward += reward
                 steps += 1
                 _write_train_state(
-                    action=action,
+                    action=executed_action,
                     ground_truth=info.get("ground_truth", "unknown"),
                     reward=reward,
                     episode=ep,
@@ -206,8 +248,11 @@ def train_custom(args: argparse.Namespace) -> None:
                     cumulative_reward=ep_reward,
                     attack_type=info.get("attack_type", "none"),
                     target=info.get("target"),
+                    proposed_action=action,
+                    executed_action=executed_action,
                 )
                 step_logger.log(ep, steps, agent.epsilon, loss, reward, ep_reward, info)
+                debug_logger.log(ep, steps, reward, done, info)
 
             metrics.log_episode(ep, ep_reward, ep_loss / max(1, steps), agent.epsilon)
             log.info("EP %4d | reward=%+8.2f | eps=%.3f | steps=%d",
@@ -220,6 +265,7 @@ def train_custom(args: argparse.Namespace) -> None:
         agent.save(CHECKPOINT_DIR / "dqn_final.pt")
     finally:
         step_logger.close()
+        debug_logger.close()
         metrics.close()
         sched_stop.set()
         for atk in attacks:

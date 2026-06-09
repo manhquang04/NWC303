@@ -60,6 +60,7 @@ def experiment(reward_config_path: Path, episodes: int, max_steps: int,
         max_steps=max_steps,
         output=eval_path,
         agent="custom",
+        reward_config=reward_config_path,
     )
 
     rows = []
@@ -75,15 +76,21 @@ def experiment(reward_config_path: Path, episodes: int, max_steps: int,
             "recall": float(row["recall"]),
             "precision": float(row["precision"]),
             "f1": float(row["f1"]),
+            "false_positive_rate": float(row["false_positive_rate"]),
             "mttd_sec": float(row["mttd_sec"]),
             "mtti_sec": float(row["mtti_sec"]),
+            "normal_action_dist": row.get("normal_action_dist", "{}"),
+            "attack_action_dist": row.get("attack_action_dist", "{}"),
+            "action_confusion": row.get("action_confusion", "{}"),
         })
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         fieldnames = [
             "config", "scenario", "avg_reward", "tp", "fp", "tn", "fn",
-            "recall", "precision", "f1", "mttd_sec", "mtti_sec",
+            "recall", "precision", "f1", "false_positive_rate",
+            "mttd_sec", "mtti_sec", "normal_action_dist", "attack_action_dist",
+            "action_confusion",
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()

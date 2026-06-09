@@ -5,10 +5,9 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
-
-from config import CFG
 
 
 def parse_args() -> argparse.Namespace:
@@ -20,7 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--save-path", type=Path, default=Path("runs/checkpoints"))
     parser.add_argument("--max-steps", type=int, default=100)
-    parser.add_argument("--attack-ratio", type=float, default=CFG.attack.attack_ratio)
+    parser.add_argument("--attack-ratio", type=float, default=0.3)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--reward-config", type=Path, default=None)
     return parser.parse_args()
@@ -58,21 +57,23 @@ def train(episodes: int, model_type: str, lr: float, batch_size: int,
     if reward_config is not None:
         if not reward_config.exists():
             raise FileNotFoundError(reward_config)
-        os.environ["SDNIDS_REWARD_CONFIG"] = str(reward_config.resolve())
 
     algo = "sb3" if model_type == "sb3" else "custom"
-    from agent.train import main as train_main
-
-    sys.argv = [
-        "train",
+    cmd = [
+        sys.executable,
+        "-m",
+        "agent.train",
         "--algo", algo,
         "--episodes", str(episodes),
         "--max-steps", str(max_steps),
         "--attack-ratio", str(attack_ratio),
         "--seed", str(seed),
     ]
+    env = os.environ.copy()
+    if reward_config is not None:
+        env["SDNIDS_REWARD_CONFIG"] = str(reward_config.resolve())
     print(f"[train.py] model={model_type} episodes={episodes} max_steps={max_steps} lr={lr} batch_size={batch_size}")
-    train_main()
+    subprocess.run(cmd, check=True, env=env)
     _copy_outputs(save_path)
     print(f"[train.py] Saved outputs to {save_path}")
 
