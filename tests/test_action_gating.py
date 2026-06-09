@@ -6,7 +6,7 @@ import pytest
 
 from agent.env_wrapper import SDNIDSEnv, detection_confidence
 from agent.reward import compute_reward
-from config import ACTION_ALLOW, ACTION_BLOCK, ACTION_ISOLATE, CFG
+from config import ACTION_ALLOW, ACTION_BLOCK, ACTION_FLAG, ACTION_ISOLATE, CFG
 
 
 class DummyCollector:
@@ -91,6 +91,15 @@ def test_low_confidence_block_or_isolate_is_gated_to_allow():
     assert env._gated_action_count == 2
 
 
+def test_low_confidence_flag_is_gated_to_allow():
+    env = _env()
+    env._last_features = {}
+
+    assert env._gate_action(ACTION_FLAG) == ACTION_ALLOW
+    assert env._last_action_gated is True
+    assert env._gated_action_count == 1
+
+
 def test_high_confidence_isolate_is_not_gated():
     env = _env()
     env._last_features = {"suspicious_port_flag": 1.0}
@@ -112,7 +121,7 @@ def test_normal_only_reset_disables_and_stops_attacks():
     assert attack.stop_count == 1
 
 
-def test_no_target_penalty_applies_to_raw_mitigation_without_target():
+def test_gated_mitigation_does_not_trigger_no_target_penalty():
     isolator = DummyIsolator()
     env = _env(isolator=isolator)
     env.reset(seed=1, options={"normal_only_episode": True})
@@ -122,7 +131,24 @@ def test_no_target_penalty_applies_to_raw_mitigation_without_target():
     assert info["raw_action"] == ACTION_ISOLATE
     assert info["action"] == ACTION_ALLOW
     assert info["action_gated"] is True
-    assert info["no_target_penalty"] is True
+    assert info["no_target_penalty"] is False
     assert isolator.actions == [ACTION_ALLOW]
-    expected = compute_reward(ACTION_ALLOW, "normal") - CFG.attack.fp_step_penalty
+    expected = compute_reward(ACTION_ALLOW, "normal")
+    assert reward == pytest.approx(expected)
+
+
+def test_executed_mitigation_without_target_still_gets_penalty():
+    isolator = DummyIsolator()
+    env = _env(isolator=isolator)
+    env.reset(seed=1, options={"normal_only_episode": True})
+    env._last_features = {"suspicious_port_flag": 1.0}
+
+    _, reward, _, _, info = env.step(ACTION_ISOLATE)
+
+    assert info["raw_action"] == ACTION_ISOLATE
+    assert info["action"] == ACTION_ISOLATE
+    assert info["action_gated"] is False
+    assert info["no_target_penalty"] is True
+    assert isolator.actions == [ACTION_ISOLATE]
+    expected = compute_reward(ACTION_ISOLATE, "normal") - CFG.attack.fp_step_penalty
     assert reward == pytest.approx(expected)

@@ -6,6 +6,7 @@ import argparse
 import csv
 from pathlib import Path
 
+from config import CFG
 from train import train
 from evaluate import evaluate
 
@@ -17,13 +18,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--episodes", type=int, default=100)
     parser.add_argument("--max-steps", type=int, default=100)
     parser.add_argument("--eval-episodes", type=int, default=10)
+    parser.add_argument("--attack-ratio", type=float, default=CFG.attack.attack_ratio)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args()
 
 
 def experiment(reward_config_path: Path, episodes: int, max_steps: int,
-               eval_episodes: int, output_path: Path, seed: int = 42) -> Path:
+               eval_episodes: int, output_path: Path, seed: int = 42,
+               attack_ratio: float = CFG.attack.attack_ratio) -> Path:
     """Train and evaluate one reward config, then export scenario metrics."""
     import pandas as pd
     import yaml
@@ -46,7 +49,7 @@ def experiment(reward_config_path: Path, episodes: int, max_steps: int,
         batch_size=64,
         save_path=save_path,
         max_steps=max_steps,
-        attack_ratio=0.4,
+        attack_ratio=attack_ratio,
         seed=seed,
         reward_config=reward_config_path,
     )
@@ -92,7 +95,15 @@ def experiment(reward_config_path: Path, episodes: int, max_steps: int,
 def main() -> int:
     """Script entry point."""
     args = parse_args()
-    experiment(args.reward, args.episodes, args.max_steps, args.eval_episodes, args.output, args.seed)
+    experiment(
+        args.reward,
+        args.episodes,
+        args.max_steps,
+        args.eval_episodes,
+        args.output,
+        args.seed,
+        args.attack_ratio,
+    )
     return 0
 
 

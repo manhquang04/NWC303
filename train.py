@@ -8,6 +8,8 @@ import shutil
 import sys
 from pathlib import Path
 
+from config import CFG
+
 
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments for custom DQN training."""
@@ -18,7 +20,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--save-path", type=Path, default=Path("runs/checkpoints"))
     parser.add_argument("--max-steps", type=int, default=100)
-    parser.add_argument("--attack-ratio", type=float, default=0.4)
+    parser.add_argument("--attack-ratio", type=float, default=CFG.attack.attack_ratio)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--reward-config", type=Path, default=None)
     return parser.parse_args()

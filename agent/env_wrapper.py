@@ -16,7 +16,7 @@ import numpy as np
 from gymnasium import spaces
 
 from agent.reward import compute_reward
-from config import ACTION_ALLOW, ACTION_BLOCK, ACTION_ISOLATE, CFG, NUM_ACTIONS
+from config import ACTION_ALLOW, ACTION_BLOCK, ACTION_FLAG, ACTION_ISOLATE, CFG, NUM_ACTIONS
 from detection.feature_extractor import FeatureExtractor
 from detection.flow_collector import FlowCollector
 from detection.state_builder import StateBuilder
@@ -114,7 +114,7 @@ class SDNIDSEnv(gym.Env):
             reward = 0.0
 
         no_target_penalty = (
-            raw_action in (ACTION_BLOCK, ACTION_ISOLATE)
+            effective_action in (ACTION_BLOCK, ACTION_ISOLATE)
             and self._last_target is None
         )
         if self.mode == "training" and no_target_penalty:
@@ -169,7 +169,7 @@ class SDNIDSEnv(gym.Env):
         self._last_effective_action = int(action)
         self._last_action_gated = False
         self._last_detection_confidence = detection_confidence(self._last_features)
-        if action in (ACTION_BLOCK, ACTION_ISOLATE):
+        if action in (ACTION_BLOCK, ACTION_ISOLATE, ACTION_FLAG):
             if self._last_detection_confidence < CFG.attack.confidence_threshold:
                 self._last_action_gated = True
                 self._gated_action_count += 1
