@@ -25,8 +25,14 @@ def _require_file(path: Path) -> Path:
 def plot_reward_ablation(ablation_df: pd.DataFrame) -> Path:
     """Plot average reward for every reward config and scenario."""
     scenario_order = ["normal", "arp", "rogue", "mixed"]
-    config_order = ["reward_v1", "reward_v2_fn_penalty", "reward_v3_isolate_boost"]
-    labels = ["v1 baseline", "v2 FN penalty", "v3 isolate"]
+    config_order = [
+        "reward_v1",
+        "reward_v2_fn_penalty",
+        "reward_v3_isolate_boost",
+        "reward_v4_balanced",
+        "reward_v5_conservative",
+    ]
+    labels = ["v1 baseline", "v2 FN", "v3 isolate", "v4 balanced", "v5 conservative"]
     colors = ["#607d8b", "#1976d2", "#d32f2f", "#7b1fa2"]
 
     fig, ax = plt.subplots(figsize=(10, 6))
