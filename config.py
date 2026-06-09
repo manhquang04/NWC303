@@ -151,6 +151,8 @@ class GlobalConfig:
 
 
 _REWARD_KEY_MAP = {
+    "reward_tp_normal": "r_normal_allowed",
+    "reward_allow_normal": "r_normal_allowed",
     "reward_tp_attack": "r_attack_blocked",
     "reward_fn_attack": "r_attack_ignored",
     "reward_fp_normal": "r_normal_blocked",

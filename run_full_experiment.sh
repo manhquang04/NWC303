@@ -29,8 +29,14 @@ echo "=== STEP 4: Ablation Reward v2 (FN penalty) ==="
 echo "=== STEP 5: Ablation Reward v3 (isolate boost) ==="
 "${PYTHON_BIN}" experiment.py --reward config/reward_v3_isolate_boost.yaml --episodes "${EPISODES}" --max-steps "${MAX_STEPS}" --eval-episodes "${EVAL_EPISODES}" --output runs/exp_v3.csv
 
-echo "=== STEP 6: Aggregate results ==="
-"${PYTHON_BIN}" aggregate_results.py --input runs/exp_v1.csv runs/exp_v2.csv runs/exp_v3.csv --output runs/final_research_results.csv
+echo "=== STEP 6: Ablation Reward v4 (balanced) ==="
+"${PYTHON_BIN}" experiment.py --reward config/reward_v4_balanced.yaml --episodes "${EPISODES}" --max-steps "${MAX_STEPS}" --eval-episodes "${EVAL_EPISODES}" --output runs/exp_v4.csv
+
+echo "=== STEP 7: Ablation Reward v5 (conservative) ==="
+"${PYTHON_BIN}" experiment.py --reward config/reward_v5_conservative.yaml --episodes "${EPISODES}" --max-steps "${MAX_STEPS}" --eval-episodes "${EVAL_EPISODES}" --output runs/exp_v5.csv
+
+echo "=== STEP 8: Aggregate results ==="
+"${PYTHON_BIN}" aggregate_results.py --input runs/exp_v1.csv runs/exp_v2.csv runs/exp_v3.csv runs/exp_v4.csv runs/exp_v5.csv --output runs/final_research_results.csv
 
 echo "=== DONE ==="
 echo "Results saved to runs/final_research_results.csv"
