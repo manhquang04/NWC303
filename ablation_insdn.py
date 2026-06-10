@@ -1,52 +1,81 @@
-"""Run RQ2 reward ablation on the InSDN dataset."""
+"""Evaluate trained InSDN reward-ablation checkpoints."""
 
 from __future__ import annotations
 
-import argparse
 import csv
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
-from experiment_real import metrics_from_training_log, reward_configs
-from train_real import train_one_dataset
+import numpy as np
+import torch
+
+from agent.dqn_agent import DQNAgent
+from config import NUM_ACTIONS
+from dataset.data_loader import InSDNDataLoader
+from evaluate_real import adapt_features, checkpoint_state_dim, compute_metrics
+from experiment_real import reward_configs
 
 
-def run_ablation_insdn(
-    output_dir: Path = Path("runs"),
-    episodes: int = 50,
-    seed: int = 42,
-    device: str = "auto",
-    num_workers: int = 8,
-    batch_size: int = 512,
-) -> List[dict]:
-    """Train/evaluate all reward configs on InSDN and export a CSV summary."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-    rows: List[dict] = []
-
+def checkpoint_dirs(runs_dir: Path = Path("runs")) -> Dict[str, Path]:
+    """Map reward config names to existing InSDN ablation checkpoints."""
+    found: Dict[str, Path] = {}
     for cfg_path in reward_configs():
-        reward_name = cfg_path.name
-        save_path = output_dir / f"ablation_insdn_{cfg_path.stem}"
-        print(f"\n[InSDN] reward_config={reward_name}")
-        args = argparse.Namespace(
-            dataset="insdn",
-            episodes=episodes,
-            reward=reward_name,
-            save_path=save_path,
-            eval_every=max(episodes, 1),
-            seed=seed,
-            device=device,
-            num_workers=num_workers,
-            batch_size=batch_size,
-            max_train_samples=None,
-            eval_limit=None,
-            no_balanced_sampler=False,
-            profile=False,
+        cfg = cfg_path.stem
+        candidates = [
+            runs_dir / f"ablation_insdn_{cfg}" / "dqn_best.pt",
+            runs_dir / f"real_insdn_{cfg}" / "dqn_best.pt",
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                found[cfg] = candidate
+                break
+    return found
+
+
+def evaluate_checkpoint(ckpt_path: Path, X_test: np.ndarray, y_test: np.ndarray) -> dict:
+    """Evaluate one trained checkpoint using batched greedy inference."""
+    state_dim = checkpoint_state_dim(ckpt_path)
+    X_eval = adapt_features(X_test, state_dim)
+    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    agent = DQNAgent(state_dim=state_dim, num_actions=NUM_ACTIONS, device="cpu")
+    state_dict = ckpt.get("model_state_dict", ckpt.get("q_net"))
+    agent.q_net.load_state_dict(state_dict)
+    agent.q_net.eval()
+
+    X_tensor = torch.from_numpy(X_eval.astype(np.float32))
+    actions_out = []
+    with torch.no_grad():
+        for start in range(0, len(X_tensor), 4096):
+            actions_out.append(agent.q_net(X_tensor[start:start + 4096]).argmax(dim=1).numpy())
+    actions = np.concatenate(actions_out).astype(np.int64)
+    return compute_metrics(y_test, actions)
+
+
+def run_ablation_insdn(output_dir: Path = Path("runs")) -> List[dict]:
+    """Load/evaluate trained InSDN ablation checkpoints and export metrics."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    checkpoints = checkpoint_dirs(output_dir)
+    expected = [p.stem for p in reward_configs()]
+    missing = [cfg for cfg in expected if cfg not in checkpoints]
+    if missing:
+        missing_list = ", ".join(missing)
+        raise FileNotFoundError(
+            "Missing InSDN ablation checkpoints for: "
+            f"{missing_list}. Run `python3 experiment_insdn.py` first."
         )
-        train_one_dataset("insdn", args)
-        metrics = metrics_from_training_log(save_path / "training_log.csv")
+
+    _, X_test, _, y_test, _ = InSDNDataLoader().load()
+    rows: List[dict] = []
+    print(f"Loaded InSDN test split: {X_test.shape}, attack_ratio={y_test.mean():.4f}")
+
+    for cfg in expected:
+        ckpt_path = checkpoints[cfg]
+        print(f"\nEvaluating {cfg}: {ckpt_path}")
+        metrics = evaluate_checkpoint(ckpt_path, X_test, y_test)
         row = {
             "dataset": "InSDN",
-            "reward_config": cfg_path.stem,
+            "reward_config": cfg,
+            "checkpoint": str(ckpt_path),
             **metrics,
         }
         rows.append(row)
