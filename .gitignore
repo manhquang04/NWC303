@@ -13,7 +13,6 @@ build/
 .venv311/
 venv/
 
-
 # IDE
 .idea/
 .vscode/
@@ -21,6 +20,7 @@ venv/
 *.swp
 *.swo
 .DS_Store
+Thumbs.db
 
 # Testing
 .pytest_cache/
@@ -30,13 +30,21 @@ htmlcov/
 # Training output
 runs/
 checkpoints/
-data/
 *.pt
+*.pth
 *.zip
 
-# Local real datasets
+# Dataset files (too large for git)
+dataset/unsw_nb15/*.csv
+dataset/unsw_nb15/official_split/
+dataset/processed/
 dataset/*.csv
 dataset/*.binetflow
+data/
+
+# Logs and temp
+*.log
+*.tmp
 
 # Web frontend
 web/frontend/node_modules/

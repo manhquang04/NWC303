@@ -1,32 +1,70 @@
-# SDN DRL-IDS: Rogue AP & ARP Spoofing Detection
+# SDN-IDS: Deep Reinforcement Learning for Intrusion Detection in Software-Defined Networks
 
-Prototype SDN lab system for detecting Rogue AP indicators and ARP spoofing in
-Mininet/Ryu using Deep Reinforcement Learning. Rogue AP behavior is represented
-through packet/flow features such as SSID beacon count and unknown SSID count,
-not through a physical Wi-Fi access point.
+> **NWC303 Research Project**
 
-## Core Pipeline
+## Abstract
 
-```text
-agent/       DQN agent, replay buffer, reward function, Gym wrapper
-config/      Reward ablation YAML files
-config.py    Central hyperparameters and action definitions
-detection/   Flow collection, feature extraction, state builder, baseline
-env/         Mininet topology, Ryu controller, attack simulator, isolation logic
-dataset/     External dataset notes and manual download instructions
-train.py     Training entry point
-evaluate.py  Evaluation metrics entry point
-experiment.py Reward-ablation runner
-evaluate_real.py Real CSV dataset evaluation without Ryu/Mininet
-experiment_real.py Real CSV reward-ablation runner without Ryu/Mininet
-run_full_experiment.sh Full training/evaluation/ablation workflow
+Nghiên cứu này đề xuất hệ thống phát hiện xâm nhập (IDS) dựa trên Deep Q-Network (DQN)
+tích hợp với kiến trúc Software-Defined Networking (SDN) sử dụng Ryu controller.
+Agent học phân biệt traffic bình thường và tấn công mạng thông qua hàm reward bất đối xứng,
+đạt F1 = 0.854 và FPR = 0.126 trên tập kiểm tra UNSW-NB15 (82,332 flows).
+
+## Research Questions
+
+| RQ | Câu hỏi | Kết quả chính |
+|---|---|---|
+| **RQ1** | DRL agent có thể phân biệt traffic bình thường và tấn công không? | F1=0.854, FPR=0.126 |
+| **RQ2** | Thiết kế hàm reward nào hiệu quả nhất? | v3_finetuned: F1=0.898, FPR=0.159 |
+
+## Project Structure
+
+```
+NWC303/
+├── agent/                    # DQN agent, replay buffer, reward function, Gym wrapper
+├── config/                   # Reward ablation YAML configs (v1–v3)
+├── config.py                 # Hyperparameters và action definitions
+├── dataset/                  # Dataset loaders
+│   ├── unsw_nb15_loader.py   # UNSW-NB15 pipeline (primary)
+│   └── __init__.py
+├── detection/                # Flow collection, feature extraction, state builder
+├── env/                      # Mininet topology, Ryu controller, attack simulator, isolator
+├── results/                  # Kết quả thực nghiệm (committed)
+│   ├── rq1/                  # Per-class metrics, confusion matrix
+│   │   ├── per_class_metrics.csv
+│   │   ├── confusion_matrix.png
+│   │   └── test_metrics.json
+│   ├── rq2/                  # Reward ablation comparison, training curves
+│   │   ├── ablation_comparison.csv
+│   │   ├── training_curves.png
+│   │   ├── supplement.txt
+│   │   ├── v1_baseline_metrics.json
+│   │   ├── v2_balanced_metrics.json
+│   │   └── v3_finetuned_metrics.json
+│   └── final_report.json
+├── train_unsw_nb15.py        # Training entrypoint (UNSW-NB15)
+├── evaluate_unsw_nb15.py     # Evaluation entrypoint (UNSW-NB15)
+├── train.py                  # Training với Mininet/Ryu (simulation)
+├── evaluate.py               # Evaluation với Mininet/Ryu
+├── requirements.txt
+└── README.md
 ```
 
-Generated outputs are written to `runs/`, `results/`, and `checkpoints/`.
+## Dataset
 
-## Install on Ubuntu VM
+**UNSW-NB15** — [UNSW Research](https://research.unsw.edu.au/projects/unsw-nb15-dataset)
 
-Use Python 3.11. Ryu 4.34 is not reliable on Python 3.12+.
+| Split | Rows | Nguồn |
+|---|---|---|
+| Train | 149,039 | Official split |
+| Validation | 26,302 | Official split |
+| Test | 82,332 | Official split |
+| Features | 192 | Sau khi encoding |
+
+> Dataset files không được commit (quá lớn). Tải về và đặt tại `dataset/unsw_nb15/`.
+
+## Installation
+
+Sử dụng Python 3.11. Ryu 4.34 không ổn định trên Python 3.12+.
 
 ```bash
 sudo apt-get update
@@ -36,63 +74,35 @@ sudo systemctl start openvswitch-switch
 python3.11 -m venv .venv311
 source .venv311/bin/activate
 pip install -r requirements.txt
-pip install cryptography
 ```
 
-Install Ryu with the setuptools compatibility patch:
+## Usage
 
+**Train (UNSW-NB15):**
 ```bash
-cd /tmp
-wget https://files.pythonhosted.org/packages/source/r/ryu/ryu-4.34.tar.gz
-tar xzf ryu-4.34.tar.gz
-cd ryu-4.34
-sed -i 's/_main_module()._orig_get_script_args = easy_install.get_script_args/pass/' ryu/hooks.py
-pip install . --no-build-isolation --no-deps
-cd ~/NWC303
+python3 train_unsw_nb15.py --episodes 100 --max-steps 500 \
+  --eval-every 5 --run-dir runs/unsw_nb15_v3
 ```
 
-Let the venv import Ubuntu's Mininet package:
-
+**Evaluate:**
 ```bash
-python - <<'PY'
-import site
-from pathlib import Path
-site_dir = Path(site.getsitepackages()[0])
-(site_dir / "ubuntu-dist-packages.pth").write_text("/usr/lib/python3/dist-packages\n")
-PY
+python3 evaluate_unsw_nb15.py --checkpoint runs/unsw_nb15_v3/dqn_best.pt
 ```
 
-Patch Ryu if `ryu-manager` fails on `ALREADY_HANDLED`:
-
+**Reward ablation (RQ2):**
 ```bash
-python - <<'PY'
-from pathlib import Path
-p = Path(".venv311/lib/python3.11/site-packages/ryu/app/wsgi.py")
-s = p.read_text()
-old = "    from eventlet.wsgi import ALREADY_HANDLED\n"
-new = (
-    "    try:\n"
-    "        from eventlet.wsgi import ALREADY_HANDLED\n"
-    "    except ImportError:\n"
-    "        ALREADY_HANDLED = object()\n"
-)
-if old in s:
-    p.write_text(s.replace(old, new))
-PY
+python3 train_unsw_nb15.py --reward-config v1_baseline --run-dir runs/ablation/v1_baseline
+python3 train_unsw_nb15.py --reward-config v2_balanced --run-dir runs/ablation/v2_balanced
+python3 train_unsw_nb15.py --reward-config v3_finetuned --run-dir runs/ablation/v3_finetuned
 ```
 
-## Run
-
-Start the Ryu controller in one terminal:
-
+**Train với Mininet/Ryu (simulation):**
 ```bash
+# Terminal 1 — Ryu controller
 source .venv311/bin/activate
 PYTHONPATH=. ryu-manager env/ryu_controller.py --observe-links
-```
 
-Train a custom DQN agent:
-
-```bash
+# Terminal 2 — Training
 sudo .venv311/bin/python train.py \
   --model custom_dqn \
   --episodes 100 \
@@ -101,95 +111,78 @@ sudo .venv311/bin/python train.py \
   --save-path runs/checkpoints
 ```
 
-Evaluate the trained checkpoint:
+## Results
 
-```bash
-sudo .venv311/bin/python evaluate.py \
-  --model runs/checkpoints/dqn_final.pt \
-  --scenario all \
-  --episodes 20 \
-  --max-steps 100 \
-  --output runs/evaluation_results.csv
-```
+### RQ1 — Detection Performance on UNSW-NB15
 
-Run a reward ablation experiment:
-
-```bash
-sudo .venv311/bin/python experiment.py \
-  --reward config/reward_v6_logic_fixed.yaml \
-  --episodes 50 \
-  --max-steps 50 \
-  --eval-episodes 10 \
-  --attack-ratio 0.4 \
-  --output runs/exp_v6.csv
-```
-
-Run the full workflow:
-
-```bash
-sudo EPISODES=50 MAX_STEPS=50 EVAL_EPISODES=10 ATTACK_RATIO=0.4 \
-  PYTHON_BIN=.venv311/bin/python bash run_full_experiment.sh
-```
-
-## Outputs for Research Questions
-
-| File | Use |
+| Metric | Value |
 |---|---|
-| `runs/checkpoints/dqn_final.pt` | Final custom DQN checkpoint |
-| `runs/checkpoints/reward_curve.png` | Training reward graph |
-| `runs/metrics.csv` | Episode reward, loss, epsilon |
-| `runs/train_steps.csv` | Step-level action, reward, target, attack type |
-| `runs/step_debug.csv` | Debug trace for proposed vs executed actions |
-| `runs/evaluation_results.csv` | Custom DQN metrics by scenario |
-| `runs/final_research_results.csv` | Reward ablation summary |
+| Precision | 0.8890 |
+| Recall | 0.8218 |
+| **F1** | **0.8541** |
+| FPR | 0.1257 |
+| TP | 37,255 |
+| FP | 4,651 |
+| TN | 32,349 |
+| FN | 8,077 |
 
-Use the files as follows:
+Các class khó nhất (rare attacks):
+- Worms: F1=0.017 (n=44)
+- Shellcode: F1=0.107 (n=378)
+- Backdoor: F1=0.137 (n=583)
 
-| RQ | Evidence |
-|---|---|
-| RQ1: Can DRL distinguish normal vs Rogue AP/ARP spoofing? | `runs/evaluation_results.csv`: TP, FP, TN, FN, recall, precision, F1 for `normal`, `arp`, `rogue`, `mixed` |
-| RQ2: Which reward function is effective? | `runs/final_research_results.csv`: compare reward configs v1-v6 by Normal FPR, attack recall, and F1 |
-| RQ3: Is performance robust outside simulation? | Requires a labeled real/VM OpenFlow testbed; Mininet results alone are not enough |
+→ Chi tiết: [`results/rq1/per_class_metrics.csv`](results/rq1/per_class_metrics.csv)
+→ Confusion matrix: [`results/rq1/confusion_matrix.png`](results/rq1/confusion_matrix.png)
 
-## Dataset
+### RQ2 — Reward Ablation
 
-Dataset notes live in `dataset/README.md`. The external ARP dataset is not
-committed; download `arp_stats.csv` manually from Mendeley and place it at
-`dataset/arp_stats.csv`.
+| Reward Config | Precision | Recall | F1 | FPR | Ep→F1≥0.80 |
+|---|---|---|---|---|---|
+| v1_baseline (symmetric −3) | 0.460 | 0.095 | 0.157 | 0.136* | Không đạt |
+| v2_balanced | 0.866 | 0.932 | 0.898 | 0.176 | Ep 5 |
+| **v3_finetuned** | **0.876** | **0.920** | **0.898** | **0.159** | Ep 5 |
 
-For the macOS-only real dataset workflow:
+*FPR thấp ở v1 do conservative collapse (Recall=0.095), không phải hiệu quả thực sự.
 
-```bash
-python3 dataset/verify_datasets.py
-python3 evaluate_real.py --dataset arp --model runs/checkpoints/dqn_final.pt
-python3 evaluate_real.py --dataset insdn --model runs/checkpoints/dqn_final.pt
-python3 experiment_real.py --dataset arp --episodes 50
-python3 experiment_real.py --dataset insdn --episodes 50
-```
-
-If a real dataset has a different feature count from the synthetic SDN state,
-`evaluate_real.py` pads or truncates features to match the checkpoint input
-dimension. `experiment_real.py` trains a dataset-specific DQN input layer.
+→ Biểu đồ training curves: [`results/rq2/training_curves.png`](results/rq2/training_curves.png)
+→ Chi tiết ablation: [`results/rq2/ablation_comparison.csv`](results/rq2/ablation_comparison.csv)
 
 ## Action Space
 
-| ID | Action | Behavior |
-|---:|---|---|
-| 0 | `allow` | No intervention |
-| 1 | `flag` | Log and continue monitoring |
-| 2 | `block` | Install DROP rule on suspicious port |
-| 3 | `isolate` | Move suspicious port into quarantine VLAN |
+| ID | Action | Hành vi |
+|---|---|---|
+| 0 | allow | Không can thiệp |
+| 1 | flag | Ghi log, tiếp tục giám sát |
+| 2 | block | Cài DROP rule trên switch port |
+| 3 | isolate | Chuyển port vào quarantine VLAN |
+
+## Reward Design (v3_finetuned — Best Config)
+
+| Tình huống | Reward |
+|---|---|
+| Allow đúng (normal flow) | +1.5 |
+| Flag đúng attack | +2.0 |
+| Block đúng attack | +5.0 |
+| Isolate đúng attack | +6.0 |
+| Bỏ sót attack (missed) | −6.0 |
+| Flag nhầm normal | −13.0 |
+| Block nhầm normal | −24.0 |
+| Isolate nhầm normal | −28.0 |
+
+Tỷ lệ penalty false-positive / missed-attack ≥ 4:1 là điều kiện cần thiết để tránh conservative collapse.
 
 ## Reward Configs
 
-Reward ablation files are in `config/`:
+Các file cấu hình reward trong `config/`:
+- `reward_v1.yaml` — Baseline đối xứng (symmetric −3)
+- `reward_v2_balanced.yaml` — Bất đối xứng cơ bản
+- `reward_v3_finetuned.yaml` — Bất đối xứng tối ưu (recommended)
 
-- `reward_v1.yaml`
-- `reward_v2_fn_penalty.yaml`
-- `reward_v3_isolate_boost.yaml`
-- `reward_v4_balanced.yaml`
-- `reward_v5_conservative.yaml`
-- `reward_v6_logic_fixed.yaml`
+## Citation
 
-The current pipeline keeps proposed and executed actions separate in logs, and
-the replay buffer learns from the executed action selected by the environment.
+Nếu sử dụng code hoặc kết quả này, vui lòng trích dẫn:
+```
+NWC303 SDN-IDS Project, 2026.
+Deep Reinforcement Learning for Intrusion Detection in SDN.
+Dataset: UNSW-NB15 (Moustafa & Slay, 2015).
+```
