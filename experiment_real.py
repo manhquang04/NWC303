@@ -78,6 +78,7 @@ def run_one_dataset(name: str, args: argparse.Namespace) -> List[dict]:
             batch_size=args.batch_size or None,
             max_train_samples=args.max_train_samples or None,
             eval_limit=args.eval_limit or None,
+            no_balanced_sampler=False,
             profile=False,
         )
         train_one_dataset(name, train_args)
