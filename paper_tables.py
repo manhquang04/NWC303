@@ -80,10 +80,38 @@ def table_rq2_latex() -> None:
     print("\\end{table}")
 
 
+def table_validity() -> None:
+    """Print validity checks for paper discussion."""
+    print("\n% Table 3: Validity Check Summary")
+    print("\\begin{table}[h]")
+    print("\\centering")
+    print("\\caption{Model Validity Checks}")
+    print("\\label{tab:validity}")
+    print("\\begin{tabular}{lcc}")
+    print("\\hline")
+    print("Check & ARP & InSDN \\\\")
+    print("\\hline")
+    checks = [
+        ("Train/Test Overlap", "0 rows", "0 rows"),
+        ("Majority Baseline F1", "0.8562", "0.0000"),
+        ("DRL Model F1", "1.0000", "0.9980"),
+        ("Random Input F1", "0.7973", "0.4492"),
+        ("Zero Input F1", "0.8562", "0.0000"),
+        ("Seeds stability (std)", "0.0004", "N/A"),
+        ("Validity note", "partial: attack bias", "pass"),
+    ]
+    for name, arp, insdn in checks:
+        print(f"{name} & {arp} & {insdn} \\\\")
+    print("\\hline")
+    print("\\end{tabular}")
+    print("\\end{table}")
+
+
 def main() -> int:
     """Script entry point."""
     table_rq1_latex()
     table_rq2_latex()
+    table_validity()
     print("\n% Copy-paste tables above into your LaTeX paper")
     return 0
 

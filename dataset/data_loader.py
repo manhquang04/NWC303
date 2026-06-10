@@ -129,10 +129,19 @@ class InSDNDataLoader:
         label_col = _find_label_column(df)
         labels = df[label_col].astype(str).str.strip().str.lower()
         y = (labels != "normal").astype(int)
+        numeric, feature_names = _numeric_features(df, label_col)
+        dedup_df = numeric.copy()
+        dedup_df[label_col] = y.to_numpy()
+        before = len(dedup_df)
+        dedup_df = dedup_df.drop_duplicates().reset_index(drop=True)
+        y = dedup_df[label_col].astype(int)
         X_train, X_test, y_train, y_test, feature_names = _split_scale(
-            df, y, self.test_size, self.random_state
+            dedup_df, y, self.test_size, self.random_state
         )
-        _print_summary("InSDN", len(df), y, feature_names)
+        removed = before - len(dedup_df)
+        _print_summary("InSDN", len(dedup_df), y, feature_names)
+        if removed:
+            print(f"[InSDN] Removed duplicate rows before split: {removed}")
         return X_train, X_test, y_train, y_test, feature_names
 
 

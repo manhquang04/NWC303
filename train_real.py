@@ -12,7 +12,7 @@ from typing import Dict, Iterable
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
 from tqdm import tqdm
 
 from agent.dqn_agent import DQNAgent
@@ -53,6 +53,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--max-train-samples", type=int, default=None)
     parser.add_argument("--eval-limit", type=int, default=None)
+    parser.add_argument(
+        "--no-balanced-sampler",
+        action="store_true",
+        help="Disable class-balanced sampling for imbalanced real datasets.",
+    )
     parser.add_argument("--profile", action="store_true", help="Print timing breakdown for training.")
     return parser.parse_args()
 
@@ -216,14 +221,28 @@ def make_loader(
     y_train: np.ndarray,
     batch_size: int,
     num_workers: int,
+    balanced: bool = True,
 ) -> DataLoader:
     """Build a torch DataLoader for tabular training."""
     X_tensor = torch.from_numpy(X_train.astype(np.float32))
     y_tensor = torch.from_numpy(y_train.astype(np.int64))
+    sampler = None
+    shuffle = True
+    if balanced and len(np.unique(y_train)) > 1:
+        counts = np.bincount(y_train.astype(int), minlength=2)
+        class_weights = 1.0 / np.maximum(counts, 1)
+        sample_weights = class_weights[y_train.astype(int)]
+        sampler = WeightedRandomSampler(
+            weights=torch.from_numpy(sample_weights.astype(np.float64)),
+            num_samples=len(sample_weights),
+            replacement=True,
+        )
+        shuffle = False
     workers = max(0, int(num_workers))
     kwargs = {
         "batch_size": batch_size,
-        "shuffle": True,
+        "shuffle": shuffle,
+        "sampler": sampler,
         "num_workers": workers,
         "pin_memory": False,
     }
@@ -255,7 +274,13 @@ def train_one_dataset(dataset_name: str, args: argparse.Namespace) -> Path:
     input_dim = int(X_train.shape[1])
     print(f"Dataset: {dataset_name} | Train: {len(X_train)} rows | Test: {len(X_test)} rows | Features: {input_dim}")
     agent = DQNAgent(state_dim=input_dim, num_actions=NUM_ACTIONS, device=str(device))
-    loader = make_loader(X_train, y_train, batch_size, args.num_workers)
+    loader = make_loader(
+        X_train,
+        y_train,
+        batch_size,
+        args.num_workers,
+        balanced=not args.no_balanced_sampler,
+    )
     fp_penalty = load_false_positive_penalty(args.reward)
     log_path = save_path / "training_log.csv"
     best_f1 = -1.0
