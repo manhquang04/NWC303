@@ -20,10 +20,12 @@ scapy
 numpy
 pandas
 pyyaml
+scikit-learn
 
 # Visualization / Logging
 matplotlib
 tensorboard
+tqdm
 
 # Web / REST
 requests

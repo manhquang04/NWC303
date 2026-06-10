@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
 def _copy_outputs(save_path: Path) -> None:
     """Copy canonical checkpoints and reward plot into the requested save path."""
     from config import CHECKPOINT_DIR, LOG_DIR
-    from evaluation.visualizer import plot_reward_curve
+    from agent.train import plot_reward_curve
 
     save_path.mkdir(parents=True, exist_ok=True)
     final_ckpt = CHECKPOINT_DIR / "dqn_final.pt"

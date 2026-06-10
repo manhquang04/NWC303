@@ -83,7 +83,12 @@ class DQNAgent:
     ) -> None:
         self.cfg = CFG.dqn
         if device == "auto":
-            device = "cuda" if torch.cuda.is_available() else "cpu"
+            if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+                device = "mps"
+            elif torch.cuda.is_available():
+                device = "cuda"
+            else:
+                device = "cpu"
         self.device = torch.device(device)
 
         self.q_net = QNetwork(state_dim, num_actions).to(self.device)
@@ -142,26 +147,32 @@ class DQNAgent:
             self.target_net.load_state_dict(self.q_net.state_dict())
         return float(loss.item())
 
-    def save(self, path: Path) -> None:
+    def save(self, path: Path, metadata: dict | None = None) -> None:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        torch.save(
-            {
-                "q_net": self.q_net.state_dict(),
-                "target_net": self.target_net.state_dict(),
-                "optimizer": self.optimizer.state_dict(),
-                "epsilon": self.epsilon,
-                "steps_done": self.steps_done,
-            },
-            path,
-        )
+        payload = {
+            "q_net": self.q_net.state_dict(),
+            "target_net": self.target_net.state_dict(),
+            "optimizer": self.optimizer.state_dict(),
+            "epsilon": self.epsilon,
+            "steps_done": self.steps_done,
+        }
+        if metadata:
+            payload.update(metadata)
+        torch.save(payload, path)
         log.info("DQN checkpoint saved -> %s", path)
 
     def load(self, path: Path) -> None:
-        ckpt = torch.load(path, map_location=self.device)
-        self.q_net.load_state_dict(ckpt["q_net"])
-        self.target_net.load_state_dict(ckpt["target_net"])
-        self.optimizer.load_state_dict(ckpt["optimizer"])
+        ckpt = torch.load(path, map_location=self.device, weights_only=False)
+        q_state = ckpt.get("q_net", ckpt.get("model_state_dict"))
+        target_state = ckpt.get("target_net", ckpt.get("target_state_dict", q_state))
+        opt_state = ckpt.get("optimizer", ckpt.get("optimizer_state_dict"))
+        if q_state is None:
+            raise KeyError("Checkpoint missing q_net/model_state_dict")
+        self.q_net.load_state_dict(q_state)
+        self.target_net.load_state_dict(target_state)
+        if opt_state is not None:
+            self.optimizer.load_state_dict(opt_state)
         self.epsilon = ckpt.get("epsilon", self.cfg.eps_end)
         self.steps_done = ckpt.get("steps_done", 0)
         log.info("DQN checkpoint loaded <- %s", path)

@@ -10,9 +10,9 @@ import random
 import sys
 import threading
 from pathlib import Path
+from typing import Optional
 
 from config import CHECKPOINT_DIR, CFG, LOG_DIR
-from evaluation.logger import MetricsLogger, setup_logging
 
 _TRAIN_STATE_FILE = Path("/tmp/sdnids_train_state.json")
 
@@ -42,6 +42,90 @@ def _write_train_state(action: int, ground_truth: str, reward: float,
         pass
 
 log = logging.getLogger(__name__)
+
+
+def setup_logging(level: Optional[str] = None) -> None:
+    """Configure global logging for training CLI runs."""
+    lvl = level or CFG.logging_cfg.log_level
+    logging.basicConfig(
+        level=getattr(logging, lvl.upper(), logging.INFO),
+        format=CFG.logging_cfg.log_format,
+    )
+
+
+class MetricsLogger:
+    """Log episode metrics to TensorBoard when available and CSV."""
+
+    def __init__(
+        self,
+        tb_dir: Path = CFG.logging_cfg.tensorboard_dir,
+        csv_path: Path = CFG.logging_cfg.csv_metrics_path,
+    ) -> None:
+        self.tb_dir = Path(tb_dir)
+        self.csv_path = Path(csv_path)
+        self.tb_dir.mkdir(parents=True, exist_ok=True)
+        self.csv_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            from torch.utils.tensorboard import SummaryWriter
+        except ImportError:  # pragma: no cover
+            SummaryWriter = None
+        self.writer = SummaryWriter(str(self.tb_dir)) if SummaryWriter is not None else None
+        write_header = (not self.csv_path.exists()) or self.csv_path.stat().st_size == 0
+        self._csv_file = open(self.csv_path, "a", newline="", encoding="utf-8")
+        self._csv = csv.writer(self._csv_file)
+        if write_header:
+            self._csv.writerow(["episode", "reward", "loss", "epsilon"])
+            self._csv_file.flush()
+
+    def log_episode(self, ep: int, reward: float, loss: float, epsilon: float) -> None:
+        if self.writer is not None:
+            self.writer.add_scalar("episode/reward", reward, ep)
+            self.writer.add_scalar("episode/loss", loss, ep)
+            self.writer.add_scalar("episode/epsilon", epsilon, ep)
+        self._csv.writerow([ep, f"{reward:.4f}", f"{loss:.6f}", f"{epsilon:.4f}"])
+        self._csv_file.flush()
+
+    def close(self) -> None:
+        if self.writer is not None:
+            self.writer.close()
+        self._csv_file.close()
+
+
+def plot_reward_curve(
+    csv_path: Path = CFG.logging_cfg.csv_metrics_path,
+    out_path: Path = CFG.logging_cfg.reward_curve_path,
+    smooth_window: int = 20,
+) -> Path:
+    """Save a reward curve PNG from the training metrics CSV."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    csv_path = Path(csv_path)
+    if not csv_path.exists():
+        raise FileNotFoundError(csv_path)
+    eps, rewards = [], []
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            eps.append(int(row["episode"]))
+            rewards.append(float(row["reward"]))
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.plot(eps, rewards, alpha=0.4, label="reward (raw)")
+    if len(rewards) >= smooth_window:
+        smoothed = np.convolve(rewards, np.ones(smooth_window) / smooth_window, mode="valid")
+        ax.plot(eps[smooth_window - 1:], smoothed, linewidth=2.0, label=f"reward (MA{smooth_window})")
+    ax.set_xlabel("Episode")
+    ax.set_ylabel("Cumulative reward")
+    ax.set_title("DRL training reward curve")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=120)
+    plt.close(fig)
+    return Path(out_path)
 
 
 def parse_args() -> argparse.Namespace:
@@ -140,7 +224,7 @@ def build_env(attack_ratio: float = CFG.attack.attack_ratio,
     )
     from env.topology import SDNTopology
     from detection.flow_collector import FlowCollector
-    from isolation.isolator import Isolator
+    from env.network_env import Isolator
 
     topology = SDNTopology()
     topology.start()

@@ -50,7 +50,7 @@ class SDNTopology:
         if os.geteuid() != 0:
             raise RuntimeError(
                 "Mininet requires root privileges.\n"
-                "Run:  sudo python3 main.py train\n"
+                "Run:  sudo python3 train.py\n"
                 "or:   sudo python3 env/topology.py"
             )
 

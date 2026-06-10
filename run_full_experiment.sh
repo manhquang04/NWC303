@@ -40,7 +40,27 @@ echo "=== STEP 8: Ablation Reward v6 (logic fixed) ==="
 "${PYTHON_BIN}" experiment.py --reward config/reward_v6_logic_fixed.yaml --episodes "${EPISODES}" --max-steps "${MAX_STEPS}" --attack-ratio "${ATTACK_RATIO}" --eval-episodes "${EVAL_EPISODES}" --output runs/exp_v6.csv
 
 echo "=== STEP 9: Aggregate results ==="
-"${PYTHON_BIN}" aggregate_results.py --input runs/exp_v1.csv runs/exp_v2.csv runs/exp_v3.csv runs/exp_v4.csv runs/exp_v5.csv runs/exp_v6.csv --output runs/final_research_results.csv
+"${PYTHON_BIN}" - <<'PY'
+from pathlib import Path
+import pandas as pd
+
+inputs = [
+    Path("runs/exp_v1.csv"),
+    Path("runs/exp_v2.csv"),
+    Path("runs/exp_v3.csv"),
+    Path("runs/exp_v4.csv"),
+    Path("runs/exp_v5.csv"),
+    Path("runs/exp_v6.csv"),
+]
+missing = [str(p) for p in inputs if not p.exists()]
+if missing:
+    raise FileNotFoundError(f"Missing experiment output(s): {', '.join(missing)}")
+
+out = Path("runs/final_research_results.csv")
+out.parent.mkdir(parents=True, exist_ok=True)
+pd.concat([pd.read_csv(p) for p in inputs], ignore_index=True).to_csv(out, index=False)
+print(f"Aggregated {len(inputs)} files -> {out}")
+PY
 
 echo "=== DONE ==="
 echo "Results saved to runs/final_research_results.csv"

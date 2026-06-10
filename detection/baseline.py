@@ -114,7 +114,7 @@ def compare_baseline_vs_drl(
 ) -> Dict[str, Dict[str, float]]:
     from agent.reward import compute_reward
     from env.attack_simulator import AttackEventLog
-    from evaluation.metrics import MetricsCalculator, StepRecord
+    from evaluate import MetricsCalculator, StepRecord
 
     baseline_calc = MetricsCalculator()
     drl_calc = MetricsCalculator()
