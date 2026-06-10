@@ -1,5 +1,5 @@
 """Dataset loaders for the SDN DRL-IDS experiments."""
 
-from .ctu13_loader import CTU13Loader
+from .unsw_nb15_loader import UNSWNB15Loader
 
-__all__ = ["CTU13Loader"]
+__all__ = ["UNSWNB15Loader"]

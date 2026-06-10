@@ -63,6 +63,18 @@ class DetectionConfig:
 
 
 @dataclass(frozen=True)
+class DatasetConfig:
+    """Tabular flow-dataset configuration for offline DRL training."""
+
+    name: str = "unsw_nb15"
+    path: Path = PROJECT_ROOT / "dataset" / "unsw_nb15"
+    processed_path: Path = PROJECT_ROOT / "dataset" / "processed" / "unsw_nb15"
+    label_mode: str = "binary"
+    validation_size: float = 0.15
+    seed: int = 42
+
+
+@dataclass(frozen=True)
 class DQNConfig:
     """DQN hyperparameters (shared by custom PyTorch and SB3)."""
 
@@ -146,6 +158,7 @@ class GlobalConfig:
     ryu: RyuConfig = field(default_factory=RyuConfig)
     attack: AttackConfig = field(default_factory=AttackConfig)
     detection: DetectionConfig = field(default_factory=DetectionConfig)
+    dataset: DatasetConfig = field(default_factory=DatasetConfig)
     dqn: DQNConfig = field(default_factory=DQNConfig)
     reward: RewardConfig = field(default_factory=RewardConfig)
     isolation: IsolationConfig = field(default_factory=IsolationConfig)

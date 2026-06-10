@@ -1,0 +1,29 @@
+{
+  "precision": 0.8890135064191286,
+  "recall": 0.821825641930645,
+  "f1": 0.8541002774020495,
+  "fpr": 0.1257027027027027,
+  "tp": 37255,
+  "fp": 4651,
+  "tn": 32349,
+  "fn": 8077,
+  "action_distribution": {
+    "allow": 40426,
+    "flag": 149,
+    "block": 1782,
+    "isolate": 39975
+  },
+  "normal_action_distribution": {
+    "allow": 32349,
+    "flag": 68,
+    "block": 873,
+    "isolate": 3710
+  },
+  "attack_action_distribution": {
+    "allow": 8077,
+    "flag": 81,
+    "block": 909,
+    "isolate": 36265
+  },
+  "confidence_threshold": 0.65
+}
