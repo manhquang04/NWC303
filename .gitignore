@@ -36,14 +36,23 @@ checkpoints/
 # Dataset files
 data/
 dataset/*.csv
+dataset/4.Rogue_AP/
+!dataset/README.md
 dataset/*.binetflow
 dataset/unsw_nb15/*.csv
 dataset/unsw_nb15/official_split/
 dataset/processed/
+processed/*
+!processed/README.md
 
 # Logs and temp
 *.log
 *.tmp
+
+# Runtime episode logs are kept locally; committed summaries/metrics are enough
+# for the thesis artifact package.
+results/sdn_runtime_arp_dqn_stress_150/episode_*/
+results/sdn_runtime_arp_dqn_hardcore_120/episode_*/
 
 # OS
 .DS_Store

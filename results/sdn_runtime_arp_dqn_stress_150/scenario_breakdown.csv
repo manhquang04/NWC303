@@ -1,0 +1,4 @@
+scenario_background_mode,episodes,tp,fn,fp,tn,precision,recall,f1,fpr,mean_detection_latency_sec
+light,50,25,0,0,25,1.0,1.0,1.0,0.0,0.36015456199645995
+mixed,50,25,0,0,25,1.0,1.0,1.0,0.0,0.363251256942749
+quiet,50,25,0,0,25,1.0,1.0,1.0,0.0,0.36344281196594236

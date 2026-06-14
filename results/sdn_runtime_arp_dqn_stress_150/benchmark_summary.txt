@@ -1,0 +1,27 @@
+ARP SDN Runtime DQN Policy Benchmark
+
+Episodes: 150 (75 attack, 75 normal)
+Confusion matrix episodes: TP=75, FN=0, FP=0, TN=75
+Precision=1.0000, Recall=1.0000, F1=1.0000, FPR=0.0000
+Mitigation rate on attack=1.0000
+Mean detection latency=0.3622828769683838 sec
+Mean mitigation latency=0.3624782657623291 sec
+Policy actions: allow=2052, flag=0, block=75
+
+Scenario breakdown by background mode:
+- light: episodes=50, TP/FN/FP/TN=25/0/0/25, F1=1.0000, FPR=0.0000
+- mixed: episodes=50, TP/FN/FP/TN=25/0/0/25, F1=1.0000, FPR=0.0000
+- quiet: episodes=50, TP/FN/FP/TN=25/0/0/25, F1=1.0000, FPR=0.0000
+
+Scenario breakdown by attack/benign variant:
+- scenario_attack_variant=intermittent: episodes=19, TP/FN/FP/TN=19/0/0/0, F1=1.0000, FPR=0.0000
+- scenario_attack_variant=random_mac: episodes=18, TP/FN/FP/TN=18/0/0/0, F1=1.0000, FPR=0.0000
+- scenario_attack_variant=slow: episodes=19, TP/FN/FP/TN=19/0/0/0, F1=1.0000, FPR=0.0000
+- scenario_attack_variant=standard: episodes=94, TP/FN/FP/TN=19/0/0/75, F1=1.0000, FPR=0.0000
+- scenario_benign_variant=arp_scan: episodes=15, TP/FN/FP/TN=0/0/0/15, F1=0.0000, FPR=0.0000
+- scenario_benign_variant=dhcp_like: episodes=15, TP/FN/FP/TN=0/0/0/15, F1=0.0000, FPR=0.0000
+- scenario_benign_variant=gratuitous: episodes=15, TP/FN/FP/TN=0/0/0/15, F1=0.0000, FPR=0.0000
+- scenario_benign_variant=noisy_gratuitous: episodes=15, TP/FN/FP/TN=0/0/0/15, F1=0.0000, FPR=0.0000
+- scenario_benign_variant=standard: episodes=90, TP/FN/FP/TN=75/0/0/15, F1=1.0000, FPR=0.0000
+
+Note: the runtime DQN policy is used online in the Ryu controller; source labels are not used at runtime.

@@ -1,0 +1,34 @@
+ARP SDN Runtime DQN Policy Benchmark
+
+Episodes: 120 (56 attack, 64 normal)
+Confusion matrix episodes: TP=44, FN=12, FP=24, TN=40
+Precision=0.6471, Recall=0.7857, F1=0.7097, FPR=0.3750
+Mitigation rate on attack=0.7857
+Mean detection latency=0.37252090735868976 sec
+Mean mitigation latency=0.3727070851759477 sec
+Policy actions: allow=2104, flag=0, block=68
+
+Scenario breakdown by background mode:
+- burst: episodes=30, TP/FN/FP/TN=10/4/8/8, F1=0.6250, FPR=0.5000
+- light: episodes=30, TP/FN/FP/TN=12/2/8/8, F1=0.7059, FPR=0.5000
+- mixed: episodes=30, TP/FN/FP/TN=10/4/8/8, F1=0.6250, FPR=0.5000
+- quiet: episodes=30, TP/FN/FP/TN=12/2/0/16, F1=0.9231, FPR=0.0000
+
+Scenario breakdown by attack/benign variant:
+- scenario_attack_variant=burst_then_sleep: episodes=8, TP/FN/FP/TN=8/0/0/0, F1=1.0000, FPR=0.0000
+- scenario_attack_variant=intermittent: episodes=8, TP/FN/FP/TN=8/0/0/0, F1=1.0000, FPR=0.0000
+- scenario_attack_variant=random_mac: episodes=8, TP/FN/FP/TN=8/0/0/0, F1=1.0000, FPR=0.0000
+- scenario_attack_variant=request_poison: episodes=8, TP/FN/FP/TN=0/8/0/0, F1=0.0000, FPR=0.0000
+- scenario_attack_variant=slow: episodes=8, TP/FN/FP/TN=8/0/0/0, F1=1.0000, FPR=0.0000
+- scenario_attack_variant=standard: episodes=72, TP/FN/FP/TN=8/0/24/40, F1=0.4000, FPR=0.3750
+- scenario_attack_variant=unicast_reply: episodes=8, TP/FN/FP/TN=4/4/0/0, F1=0.6667, FPR=0.0000
+- scenario_benign_variant=arp_scan: episodes=8, TP/FN/FP/TN=0/0/0/8, F1=0.0000, FPR=0.0000
+- scenario_benign_variant=arp_storm: episodes=8, TP/FN/FP/TN=0/0/8/0, F1=0.0000, FPR=1.0000
+- scenario_benign_variant=dhcp_like: episodes=8, TP/FN/FP/TN=0/0/0/8, F1=0.0000, FPR=0.0000
+- scenario_benign_variant=gateway_failover: episodes=8, TP/FN/FP/TN=0/0/8/0, F1=0.0000, FPR=1.0000
+- scenario_benign_variant=gratuitous: episodes=8, TP/FN/FP/TN=0/0/0/8, F1=0.0000, FPR=0.0000
+- scenario_benign_variant=ip_reassignment: episodes=8, TP/FN/FP/TN=0/0/8/0, F1=0.0000, FPR=1.0000
+- scenario_benign_variant=noisy_gratuitous: episodes=8, TP/FN/FP/TN=0/0/0/8, F1=0.0000, FPR=0.0000
+- scenario_benign_variant=standard: episodes=64, TP/FN/FP/TN=44/12/0/8, F1=0.8800, FPR=0.0000
+
+Note: the runtime DQN policy is used online in the Ryu controller; source labels are not used at runtime.

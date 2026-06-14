@@ -1,0 +1,12 @@
+category,path,description
+curated_report,reports/thesis/README.md,Thesis-ready report for RQ1-RQ3
+curated_table,reports/thesis/tables/rq1_detection_results.csv,Final detection results table
+curated_table,reports/thesis/tables/rq2_reward_ablation.csv,Reward ablation table
+curated_table,reports/thesis/tables/rq3_runtime_robustness.csv,Runtime robustness table
+primary_result,results/sdn_runtime_arp_dqn_stress_150/,"Controlled ARP SDN runtime stress, 150 episodes"
+primary_result,results/sdn_runtime_arp_dqn_hardcore_120/,"Hardcore ARP SDN runtime, 120 episodes"
+primary_result,results/rogue_ap_per_bssid_lofo/,Best Rogue AP offline LOFO evidence
+primary_result,results/rogue_ap_runtime_rq_summary/,Live Wi-Fi Rogue AP runtime scenario summary
+primary_model,models/rogue_ap_runtime/,Exported Rogue AP runtime model bundle
+primary_code,sdn_runtime/,Runtime controllers and sensors
+primary_code,scripts/,"Dataset building, training, ablation, and analysis scripts"

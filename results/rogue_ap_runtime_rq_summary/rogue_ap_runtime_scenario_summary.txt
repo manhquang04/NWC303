@@ -1,0 +1,10 @@
+Rogue AP Runtime Scenario Summary
+
+- normal_live_wifi: windows=300, alerts=3, alert_rate=0.0100, policy_alerts=3, model_alerts=0, top_unknown_bssid=a4:39:b3:9f:28:73
+- phone_hotspot_rogue: windows=300, alerts=300, alert_rate=1.0000, policy_alerts=300, model_alerts=0, top_unknown_bssid=5e:e1:bd:75:83:55
+- evil_twin_same_ssid: windows=300, alerts=300, alert_rate=1.0000, policy_alerts=300, model_alerts=0, top_unknown_bssid=5a:3c:c5:ad:53:d8
+
+Interpretation:
+- Normal live Wi-Fi estimates false alarms under the current allowlist policy.
+- Phone hotspot and evil-twin tests are real monitor-mode Wi-Fi runtime tests.
+- Detection is driven by the fingerprint/allowlist policy layer; the exported ML scorer did not independently flag these runtime windows.

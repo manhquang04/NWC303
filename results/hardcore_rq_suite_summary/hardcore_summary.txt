@@ -1,0 +1,12 @@
+Hardcore RQ suite summary
+
+RQ1/RQ3 key result: controlled ARP SDN stress remains perfect, but hardcore ARP evasion/benign-churn test drops to F1=0.7097, recall=0.7857, FPR=0.3750.
+This is scientifically useful: it shows the detector is strong under controlled SDN scenarios but has clear limits under request-poison attacks and legitimate MAC-churn-like benign cases.
+
+ARP hardcore failure modes:
+- False negatives: request_poison across all backgrounds; unicast_reply under burst/mixed backgrounds.
+- False positives: gateway_failover, ip_reassignment, and arp_storm benign variants.
+
+RQ2 key result: aggressive rewards improve recall/F1 for Rogue AP DQN, while FPR-constrained rewards reduce false alarms at the cost of recall. ARP offline DQN best F1 is conservative_reward, but FPR remains high.
+
+Thesis-safe conclusion: do not present F1=1.0 as universal proof. Present it as controlled-testbed success, then use hardcore_120 to demonstrate robustness boundaries and motivate future adaptive/context-aware ARP policy.

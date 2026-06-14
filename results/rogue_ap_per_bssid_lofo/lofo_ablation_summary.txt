@@ -1,0 +1,20 @@
+Per-BSSID LOFO strict feature ablation
+
+- full/xgb_per_bssid/fpr_le_0.20: F1=0.6745+/-0.1826, precision=0.5532, recall=0.9409, FPR=0.0561, AUROC=0.9786, PR-AUC=0.7103, features=143
+- drop_timing_seq/xgb_per_bssid/fpr_le_0.20: F1=0.6647+/-0.1776, precision=0.5352, recall=0.9476, FPR=0.0595, AUROC=0.9761, PR-AUC=0.6828, features=129
+- full/xgb_per_bssid/best_f1: F1=0.6631+/-0.1920, precision=0.5301, recall=0.9672, FPR=0.0649, AUROC=0.9786, PR-AUC=0.7103, features=143
+- drop_timing_seq/xgb_per_bssid/best_f1: F1=0.6625+/-0.1853, precision=0.5267, recall=0.9697, FPR=0.0641, AUROC=0.9761, PR-AUC=0.6828, features=129
+- drop_phy_radio/xgb_per_bssid/fpr_le_0.20: F1=0.6499+/-0.1899, precision=0.5135, recall=0.9674, FPR=0.0710, AUROC=0.9769, PR-AUC=0.7536, features=95
+- drop_phy_radio/xgb_per_bssid/best_f1: F1=0.6461+/-0.1824, precision=0.5503, recall=0.8875, FPR=0.0556, AUROC=0.9769, PR-AUC=0.7536, features=95
+- drop_timing_seq/rf_per_bssid/best_f1: F1=0.6369+/-0.1852, precision=0.5079, recall=0.9391, FPR=0.0697, AUROC=0.9689, PR-AUC=0.6202, features=129
+- drop_timing_seq/rf_per_bssid/fpr_le_0.20: F1=0.6357+/-0.1858, precision=0.5031, recall=0.9487, FPR=0.0718, AUROC=0.9689, PR-AUC=0.6202, features=129
+- full/rf_per_bssid/best_f1: F1=0.6341+/-0.1936, precision=0.4981, recall=0.9612, FPR=0.0771, AUROC=0.9706, PR-AUC=0.6390, features=143
+- full/rf_per_bssid/fpr_le_0.20: F1=0.6289+/-0.1946, precision=0.4880, recall=0.9749, FPR=0.0822, AUROC=0.9706, PR-AUC=0.6390, features=143
+- drop_phy_radio/rf_per_bssid/fpr_le_0.20: F1=0.6218+/-0.1880, precision=0.4802, recall=0.9684, FPR=0.0832, AUROC=0.9686, PR-AUC=0.6424, features=95
+- drop_phy_radio/rf_per_bssid/best_f1: F1=0.6214+/-0.1863, precision=0.5021, recall=0.9131, FPR=0.0734, AUROC=0.9686, PR-AUC=0.6424, features=95
+- drop_mgmt_fingerprint/xgb_per_bssid/best_f1: F1=0.4907+/-0.1674, precision=0.4093, recall=0.7278, FPR=0.0947, AUROC=0.9260, PR-AUC=0.5256, features=121
+- drop_mgmt_phy/xgb_per_bssid/best_f1: F1=0.4875+/-0.1504, precision=0.4030, recall=0.6827, FPR=0.0867, AUROC=0.9183, PR-AUC=0.5294, features=73
+
+Interpretation:
+- If full >> drop_mgmt_fingerprint, the high score depends strongly on beacon/capability/SSID fingerprints.
+- If drop_mgmt_phy_timing_seq remains strong, the detector has broader behavioral signal.

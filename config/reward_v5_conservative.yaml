@@ -1,8 +1,0 @@
-# V5: Conservative - prefer suspicion before mitigation.
-reward_tp_normal: 20
-reward_tp_attack: 25
-reward_fn_attack: -30
-reward_fp_normal: -100
-reward_isolate_correct: 30
-reward_isolate_wrong: -100
-reward_allow_normal: 20

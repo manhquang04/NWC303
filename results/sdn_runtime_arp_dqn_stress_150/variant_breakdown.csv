@@ -1,0 +1,10 @@
+variant_group,variant,episodes,tp,fn,fp,tn,precision,recall,f1,fpr,mean_detection_latency_sec
+scenario_attack_variant,intermittent,19,19,0,0,0,1.0,1.0,1.0,0.0,0.3575401682602732
+scenario_attack_variant,random_mac,18,18,0,0,0,1.0,1.0,1.0,0.0,0.3632342020670573
+scenario_attack_variant,slow,19,19,0,0,0,1.0,1.0,1.0,0.0,0.36194407312493576
+scenario_attack_variant,standard,94,19,0,0,75,1.0,1.0,1.0,0.0,0.3664631341633044
+scenario_benign_variant,arp_scan,15,0,0,0,15,0.0,0.0,0.0,0.0,
+scenario_benign_variant,dhcp_like,15,0,0,0,15,0.0,0.0,0.0,0.0,
+scenario_benign_variant,gratuitous,15,0,0,0,15,0.0,0.0,0.0,0.0,
+scenario_benign_variant,noisy_gratuitous,15,0,0,0,15,0.0,0.0,0.0,0.0,
+scenario_benign_variant,standard,90,75,0,0,15,1.0,1.0,1.0,0.0,0.3622828769683838

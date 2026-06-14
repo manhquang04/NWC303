@@ -1,8 +1,0 @@
-# V4: Balanced - strong FP penalty to avoid over-isolation.
-reward_tp_normal: 15
-reward_tp_attack: 30
-reward_fn_attack: -50
-reward_fp_normal: -80
-reward_isolate_correct: 40
-reward_isolate_wrong: -80
-reward_allow_normal: 15

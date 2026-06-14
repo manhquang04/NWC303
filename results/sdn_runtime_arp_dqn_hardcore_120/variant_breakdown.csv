@@ -1,0 +1,16 @@
+variant_group,variant,episodes,tp,fn,fp,tn,precision,recall,f1,fpr,mean_detection_latency_sec
+scenario_attack_variant,burst_then_sleep,8,8,0,0,0,1.0,1.0,1.0,0.0,0.37902456521987915
+scenario_attack_variant,intermittent,8,8,0,0,0,1.0,1.0,1.0,0.0,0.36753079295158386
+scenario_attack_variant,random_mac,8,8,0,0,0,1.0,1.0,1.0,0.0,0.36303776502609253
+scenario_attack_variant,request_poison,8,0,8,0,0,0.0,0.0,0.0,0.0,
+scenario_attack_variant,slow,8,8,0,0,0,1.0,1.0,1.0,0.0,0.4064733386039734
+scenario_attack_variant,standard,72,8,0,24,40,0.25,1.0,0.4,0.375,0.35705697536468506
+scenario_attack_variant,unicast_reply,8,4,4,0,0,1.0,0.5,0.6666666666666666,0.0,0.3514831066131592
+scenario_benign_variant,arp_scan,8,0,0,0,8,0.0,0.0,0.0,0.0,
+scenario_benign_variant,arp_storm,8,0,0,8,0,0.0,0.0,0.0,1.0,
+scenario_benign_variant,dhcp_like,8,0,0,0,8,0.0,0.0,0.0,0.0,
+scenario_benign_variant,gateway_failover,8,0,0,8,0,0.0,0.0,0.0,1.0,
+scenario_benign_variant,gratuitous,8,0,0,0,8,0.0,0.0,0.0,0.0,
+scenario_benign_variant,ip_reassignment,8,0,0,8,0,0.0,0.0,0.0,1.0,
+scenario_benign_variant,noisy_gratuitous,8,0,0,0,8,0.0,0.0,0.0,0.0,
+scenario_benign_variant,standard,64,44,12,0,8,1.0,0.7857142857142857,0.88,0.0,0.37252090735868976

@@ -1,6 +1,0 @@
-reward_tp_normal: 10
-reward_tp_attack: 20
-reward_fn_attack: -30
-reward_fp_normal: -10
-reward_isolate_correct: 60
-reward_isolate_wrong: -20

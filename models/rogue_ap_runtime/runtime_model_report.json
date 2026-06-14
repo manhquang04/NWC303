@@ -1,0 +1,135 @@
+{
+  "data_dir": "processed/rogue_ap_event_windows/tight_event",
+  "model_path": "models/rogue_ap_runtime/rogue_ap_runtime_rf.joblib",
+  "feature_count": 17,
+  "features": [
+    "n_frames",
+    "ratio_retry",
+    "ratio_protected",
+    "ratio_moredata",
+    "ratio_pwrmgt",
+    "ratio_order",
+    "ratio_frag",
+    "ratio_ds_0x00000000",
+    "ratio_ds_0x00000001",
+    "ratio_ds_0x00000002",
+    "ratio_ds_0x00000003",
+    "ratio_type_0",
+    "ratio_type_1",
+    "ratio_type_2",
+    "ratio_llc_present",
+    "ratio_ip_present",
+    "ratio_tcp_present"
+  ],
+  "train_rows": 1918,
+  "val_rows": 701,
+  "test_rows": 1344,
+  "train_label_counts": {
+    "0": 1288,
+    "1": 630
+  },
+  "val_label_counts": {
+    "0": 478,
+    "1": 223
+  },
+  "test_label_counts": {
+    "0": 896,
+    "1": 448
+  },
+  "validation_threshold_metrics": {
+    "threshold": 0.4723767035821083,
+    "precision": 0.5476190476190477,
+    "recall": 0.515695067264574,
+    "f1": 0.5311778290993071,
+    "fpr": 0.19874476987447698,
+    "auroc": 0.7883886522693585,
+    "pr_auc": 0.581628656331596,
+    "tn": 383,
+    "fp": 95,
+    "fn": 108,
+    "tp": 115
+  },
+  "test_metrics": {
+    "threshold": 0.4723767035821083,
+    "precision": 0.5300925925925926,
+    "recall": 0.5111607142857143,
+    "f1": 0.5204545454545455,
+    "fpr": 0.2265625,
+    "auroc": 0.7588837292729591,
+    "pr_auc": 0.5399241116744632,
+    "tn": 693,
+    "fp": 203,
+    "fn": 219,
+    "tp": 229
+  },
+  "top_features": [
+    {
+      "feature": "ratio_type_0",
+      "importance": 0.297181374699702
+    },
+    {
+      "feature": "ratio_ds_0x00000001",
+      "importance": 0.09205471001904166
+    },
+    {
+      "feature": "ratio_type_1",
+      "importance": 0.08360646317403961
+    },
+    {
+      "feature": "ratio_ds_0x00000002",
+      "importance": 0.08084907754750799
+    },
+    {
+      "feature": "ratio_retry",
+      "importance": 0.07335013039245711
+    },
+    {
+      "feature": "ratio_protected",
+      "importance": 0.07089786883054916
+    },
+    {
+      "feature": "ratio_tcp_present",
+      "importance": 0.06014946975943237
+    },
+    {
+      "feature": "ratio_type_2",
+      "importance": 0.059647707819929154
+    },
+    {
+      "feature": "ratio_ds_0x00000000",
+      "importance": 0.05794633413096578
+    },
+    {
+      "feature": "ratio_ip_present",
+      "importance": 0.05129903355131957
+    },
+    {
+      "feature": "ratio_llc_present",
+      "importance": 0.05040686600785024
+    },
+    {
+      "feature": "ratio_pwrmgt",
+      "importance": 0.013473056220686857
+    },
+    {
+      "feature": "ratio_moredata",
+      "importance": 0.008281688782454171
+    },
+    {
+      "feature": "ratio_order",
+      "importance": 0.0005532084305614906
+    },
+    {
+      "feature": "ratio_frag",
+      "importance": 0.000245661190896583
+    },
+    {
+      "feature": "ratio_ds_0x00000003",
+      "importance": 5.7349442606249e-05
+    },
+    {
+      "feature": "n_frames",
+      "importance": 0.0
+    }
+  ]
+}

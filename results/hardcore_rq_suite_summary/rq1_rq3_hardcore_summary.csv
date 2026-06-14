@@ -1,0 +1,6 @@
+rq,task,experiment,episodes_or_windows,precision,recall,f1,fpr,detection_latency_sec,claim
+RQ1/RQ3,ARP Spoofing,controlled_sdn_stress_150,150,1.0,1.0,1.0,0.0,0.3622828769683838,controlled SDN runtime effectiveness; not universal proof
+RQ1/RQ3,ARP Spoofing,hardcore_sdn_evasion_and_benign_churn_120,120,0.6470588235294118,0.7857142857142857,0.7096774193548386,0.375,0.37252090735868976,hardcore robustness limit; exposes request-poison FN and benign churn FP
+RQ1/RQ3,Rogue AP,normal_live_wifi,300,,,,0.01,,live Wi-Fi monitor-mode hybrid policy runtime evidence
+RQ1/RQ3,Rogue AP,phone_hotspot_rogue,300,,1.0,,,,live Wi-Fi monitor-mode hybrid policy runtime evidence
+RQ1/RQ3,Rogue AP,evil_twin_same_ssid,300,,1.0,,,,live Wi-Fi monitor-mode hybrid policy runtime evidence

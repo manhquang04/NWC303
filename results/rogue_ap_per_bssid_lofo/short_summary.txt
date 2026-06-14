@@ -1,0 +1,12 @@
+Per-BSSID/per-transmitter Rogue AP LOFO summary
+
+Aggregated windows: 39527; files: 40; positive windows: 1288.
+Feature count: 143. Audit/group IDs are excluded from model features.
+
+Top LOFO configurations by mean F1:
+- xgb_per_bssid/fpr_le_0.20: F1=0.6745+/-0.1826, precision=0.5532, recall=0.9409, FPR=0.0561, AUROC=0.9786, PR-AUC=0.7103
+- xgb_per_bssid/fpr_le_0.30: F1=0.6745+/-0.1826, precision=0.5532, recall=0.9409, FPR=0.0561, AUROC=0.9786, PR-AUC=0.7103
+- xgb_per_bssid/best_f1: F1=0.6631+/-0.1920, precision=0.5301, recall=0.9672, FPR=0.0649, AUROC=0.9786, PR-AUC=0.7103
+- rf_per_bssid/best_f1: F1=0.6321+/-0.1932, precision=0.4973, recall=0.9565, FPR=0.0772, AUROC=0.9706, PR-AUC=0.6365
+- rf_per_bssid/fpr_le_0.20: F1=0.6284+/-0.1942, precision=0.4878, recall=0.9734, FPR=0.0821, AUROC=0.9706, PR-AUC=0.6365
+- rf_per_bssid/fpr_le_0.30: F1=0.6284+/-0.1942, precision=0.4878, recall=0.9734, FPR=0.0821, AUROC=0.9706, PR-AUC=0.6365

@@ -1,0 +1,8 @@
+| task | experiment | setting | precision | recall | f1 | fpr | auroc | pr_auc | notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ARP Spoofing | ARP controlled SDN runtime | 150 episodes (75 attack, 75 normal) | 1.0000 | 1.0000 | 1.0000 | 0.0000 |  |  | Controlled success |
+| ARP Spoofing | ARP hardcore SDN runtime | 120 episodes (56 attack, 64 normal) | 0.6471 | 0.7857 | 0.7097 | 0.3750 |  |  | Hardcore robustness boundary |
+| Rogue AP | Per-BSSID XGBoost LOFO | 17 held-out positive files; 16487 test windows | 0.5532 | 0.9409 | 0.6745 | 0.0561 | 0.9786 | 0.7103 | Best offline Rogue AP result; source_file not used as feature |
+| Rogue AP | Live Wi-Fi runtime: normal_live_wifi | 300 monitor-mode windows |  |  |  | 0.0100 |  |  | Hybrid monitor-mode policy; model_alerts=0, policy_alerts=3 |
+| Rogue AP | Live Wi-Fi runtime: phone_hotspot_rogue | 300 monitor-mode windows |  | 1.0000 |  |  |  |  | Hybrid monitor-mode policy; model_alerts=0, policy_alerts=300 |
+| Rogue AP | Live Wi-Fi runtime: evil_twin_same_ssid | 300 monitor-mode windows |  | 1.0000 |  |  |  |  | Hybrid monitor-mode policy; model_alerts=0, policy_alerts=300 |

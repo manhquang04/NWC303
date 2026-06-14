@@ -1,0 +1,4 @@
+scenario,windows,frames_seen,alerts,alert_rate,policy_alerts,model_alerts,mean_score,max_score,top_unknown_bssid,elapsed_seconds
+normal_live_wifi,300,3010,3,0.01,3,0,0.2097003977386244,0.353221649861953,a4:39:b3:9f:28:73,261.60438561439514
+phone_hotspot_rogue,300,3010,300,1.0,300,0,0.1633117949111385,0.3420983900684356,5e:e1:bd:75:83:55,172.10726118087769
+evil_twin_same_ssid,300,3010,300,1.0,300,0,0.181097552274055,0.3534195327028485,5a:3c:c5:ad:53:d8,150.05332922935486
